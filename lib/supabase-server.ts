@@ -1,12 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+import {
+  getSupabasePublicEnv,
+  getSupabaseServiceRoleKey,
+  SUPABASE_ENV_HELP,
+} from '@/lib/supabase-env'
+
 export function createSupabaseServer() {
+  const env = getSupabasePublicEnv()
+  if (!env) {
+    throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP}`)
+  }
+
   const cookieStore = cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.url,
+    env.publicKey,
     {
       cookies: {
         getAll() {
@@ -27,11 +38,17 @@ export function createSupabaseServer() {
 }
 
 export function createSupabaseServerAdmin() {
+  const env = getSupabasePublicEnv()
+  const serviceKey = getSupabaseServiceRoleKey()
+  if (!env || !serviceKey) {
+    throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP} Also set SUPABASE_SERVICE_ROLE_KEY for admin client.`)
+  }
+
   const cookieStore = cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    env.url,
+    serviceKey,
     {
       cookies: {
         getAll() {

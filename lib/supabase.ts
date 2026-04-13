@@ -2,11 +2,14 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
+import { getSupabasePublicEnv, SUPABASE_ENV_HELP } from '@/lib/supabase-env'
+
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const env = getSupabasePublicEnv()
+  if (!env) {
+    throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP}`)
+  }
+  return createBrowserClient(env.url, env.publicKey)
 }
 
 // Singleton para componentes cliente

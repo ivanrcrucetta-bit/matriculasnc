@@ -1,12 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import {
+  getSupabasePublicEnv,
+  SUPABASE_ENV_HELP,
+} from '@/lib/supabase-env'
+
 export async function middleware(request: NextRequest) {
+  const env = getSupabasePublicEnv()
+  if (!env) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[middleware] ${SUPABASE_ENV_HELP}`)
+      return NextResponse.next({ request })
+    }
+    throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP}`)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.url,
+    env.publicKey,
     {
       cookies: {
         getAll() {
