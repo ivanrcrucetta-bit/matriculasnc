@@ -410,14 +410,14 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
         <Card>
           <CardHeader className="pb-2">
             <SeccionHeader
-              titulo="Comprador"
+              titulo="Cliente"
               open={secOpen.comprador}
               onToggle={() => toggle('comprador')}
             />
           </CardHeader>
           {secOpen.comprador && (
             <CardContent>
-              <PersonaFields form={form} prefix="comprador" titulo="Datos del Comprador" />
+              <PersonaFields form={form} prefix="comprador" titulo="Datos del Cliente" />
             </CardContent>
           )}
         </Card>

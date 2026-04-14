@@ -10,6 +10,7 @@ import {
   Search,
   LogOut,
   ChevronRight,
+  X,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { getSupabaseBrowser } from '@/lib/supabase'
@@ -17,6 +18,8 @@ import { toast } from 'sonner'
 
 interface SidebarProps {
   alertasCount?: number
+  open?: boolean
+  onClose?: () => void
 }
 
 const nav = [
@@ -26,7 +29,7 @@ const nav = [
   { href: '/buscar', label: 'Buscar por Cédula', icon: Search },
 ]
 
-export default function Sidebar({ alertasCount = 0 }: SidebarProps) {
+export default function Sidebar({ alertasCount = 0, open = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -38,9 +41,18 @@ export default function Sidebar({ alertasCount = 0 }: SidebarProps) {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-[220px] bg-white border-r border-border flex flex-col z-30 shadow-sm">
+    <aside
+      className={cn(
+        'fixed left-0 top-0 h-full w-[220px] bg-white border-r border-border flex flex-col z-30 shadow-sm',
+        'transition-transform duration-200 ease-in-out',
+        // Móvil: oculto por defecto, visible cuando open=true
+        open ? 'translate-x-0' : '-translate-x-full',
+        // Desktop: siempre visible
+        'md:translate-x-0'
+      )}
+    >
       {/* Logo */}
-      <div className="p-5 border-b border-border">
+      <div className="p-5 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-nc-green flex items-center justify-center flex-shrink-0">
             <span className="text-white text-sm font-bold">NC</span>
@@ -54,6 +66,14 @@ export default function Sidebar({ alertasCount = 0 }: SidebarProps) {
             </p>
           </div>
         </div>
+        {/* Botón cerrar solo en móvil */}
+        <button
+          onClick={onClose}
+          className="md:hidden p-1 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+          aria-label="Cerrar menú"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
       </div>
 
       {/* Navegación */}
@@ -68,6 +88,7 @@ export default function Sidebar({ alertasCount = 0 }: SidebarProps) {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors group',
                 active

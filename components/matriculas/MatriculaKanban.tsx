@@ -18,7 +18,8 @@ export default function MatriculaKanban({
   const columnas = etapasConMatriculas.length > 0 ? etapasConMatriculas : ETAPAS_ORDEN.slice(0, 5)
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 min-h-[400px]">
+    <div className="min-w-0 overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+      <div className="flex gap-3 md:gap-4 pb-4 min-h-[400px] w-max md:w-auto">
       {columnas.map((etapa) => {
         const info = ETAPA_INFO[etapa]
         const items = matriculas.filter((m) => m.etapa === etapa)
@@ -37,7 +38,7 @@ export default function MatriculaKanban({
         return (
           <div
             key={etapa}
-            className="flex-shrink-0 w-72 flex flex-col"
+            className="flex-shrink-0 w-64 md:w-72 flex flex-col"
           >
             <div
               className={`flex items-center justify-between px-3 py-2.5 rounded-t-lg border ${headerColor[info.color]} mb-0`}
@@ -64,6 +65,7 @@ export default function MatriculaKanban({
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

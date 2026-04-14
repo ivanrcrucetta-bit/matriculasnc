@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { es } from 'date-fns/locale'
-import { CalendarIcon, Loader2, Printer, FileDown, CheckCircle, X } from 'lucide-react'
+import { CalendarIcon, Loader2, Printer, FileDown, CheckCircle, X, ScanLine } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -286,6 +287,12 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
           <Printer className="h-4 w-4" />
           Imprimir sobre
         </Button>
+        <Link href={`/matriculas/${matricula.id}/imprimir`} target="_blank" className="block">
+          <Button variant="outline" className="w-full gap-2">
+            <ScanLine className="h-4 w-4" />
+            Imprimir documentos
+          </Button>
+        </Link>
         <Button
           variant="outline"
           className="w-full gap-2"

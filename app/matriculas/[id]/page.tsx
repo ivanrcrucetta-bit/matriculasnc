@@ -139,7 +139,7 @@ export default async function MatriculaDetallePage({ params }: DetallePageProps)
               persona ? (
                 <div key={persona.id} className="bg-white border border-border rounded-lg p-6">
                   <h2 className="font-semibold text-gray-800 mb-4 capitalize">
-                    {persona.rol === 'comprador' ? 'Comprador' : 'Vendedor'}
+                    {persona.rol === 'comprador' ? 'Cliente' : 'Vendedor'}
                   </h2>
                   <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                     {[
@@ -226,6 +226,13 @@ export default async function MatriculaDetallePage({ params }: DetallePageProps)
                 {comprador.direccion && <div>{comprador.direccion}</div>}
                 <div>República Dominicana</div>
               </>
+            )}
+            {(matricula.marca || matricula.modelo) && (
+              <div style={{ marginTop: '0.12in', fontSize: '11pt', color: '#444' }}>
+                {[matricula.marca, matricula.modelo, matricula.año?.toString(), matricula.color]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
             )}
           </div>
 

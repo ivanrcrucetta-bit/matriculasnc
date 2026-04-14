@@ -73,7 +73,7 @@ const items = [
 
 export default function StatsCards({ stats }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
       {items.map(({ key, label, icon: Icon, color, bg, alerta }) => {
         const valor = stats[key]
         const esAlerta = alerta && valor > 0
@@ -86,21 +86,21 @@ export default function StatsCards({ stats }: StatsCardsProps) {
               esAlerta && 'ring-1 ring-red-200'
             )}
           >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{label}</p>
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-tight">{label}</p>
                   <p
                     className={cn(
-                      'text-3xl font-bold mt-1',
+                      'text-2xl sm:text-3xl font-bold mt-1',
                       esAlerta ? 'text-red-600' : 'text-gray-900'
                     )}
                   >
                     {valor}
                   </p>
                 </div>
-                <div className={cn('p-2 rounded-lg', bg)}>
-                  <Icon className={cn('h-5 w-5', esAlerta ? 'text-red-500' : color)} />
+                <div className={cn('p-2 rounded-lg flex-shrink-0', bg)}>
+                  <Icon className={cn('h-4 w-4 sm:h-5 sm:w-5', esAlerta ? 'text-red-500' : color)} />
                 </div>
               </div>
             </CardContent>

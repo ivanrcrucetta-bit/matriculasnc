@@ -166,7 +166,7 @@ function ExpedienteDocument({
         {/* Comprador */}
         {comprador && (
           <View style={styles.seccion}>
-            <Text style={styles.seccionTitulo}>Comprador</Text>
+            <Text style={styles.seccionTitulo}>Cliente</Text>
             <View style={styles.grid2}>
               {[
                 { label: 'Nombre', value: `${comprador.nombre} ${comprador.apellido}` },

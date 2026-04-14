@@ -165,7 +165,7 @@ export const ETAPAS_ORDEN: Etapa[] = [
 
 export const TIPO_DOC_LABELS: Record<TipoDocumento, string> = {
   copia_matricula: 'Copia Matrícula',
-  cedula_comprador: 'Cédula Comprador',
+  cedula_comprador: 'Cédula Cliente',
   cedula_vendedor: 'Cédula Vendedor',
   contrato_venta: 'Contrato de Venta',
   otro: 'Otro',

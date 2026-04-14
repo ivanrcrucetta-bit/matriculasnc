@@ -177,7 +177,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardLayout alertasCount={alertas.length}>
-      <div className="p-8 space-y-8">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

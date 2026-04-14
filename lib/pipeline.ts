@@ -19,7 +19,7 @@ export function calcularBloqueos(
   const tipos = documentos.map((d) => d.tipo)
 
   if (!tipos.includes('copia_matricula')) bloqueos.push('Falta copia de matrícula')
-  if (!tipos.includes('cedula_comprador')) bloqueos.push('Falta cédula del comprador')
+  if (!tipos.includes('cedula_comprador')) bloqueos.push('Falta cédula del cliente')
   if (!tipos.includes('cedula_vendedor')) bloqueos.push('Falta cédula del vendedor')
   if (matricula.lleva_oposicion && !matricula.fecha_oposicion)
     bloqueos.push('Oposición no registrada')

@@ -29,21 +29,21 @@ export default function MatriculaTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            <TableHead>Código</TableHead>
-            <TableHead>Comprador</TableHead>
-            <TableHead>Placa</TableHead>
-            <TableHead>Crédito</TableHead>
-            <TableHead className="text-center">Docs</TableHead>
-            <TableHead className="text-center">Oposición</TableHead>
+            <TableHead className="w-[90px]">Código</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead className="hidden sm:table-cell">Placa</TableHead>
+            <TableHead className="hidden md:table-cell">Crédito</TableHead>
+            <TableHead className="text-center w-[60px]">Docs</TableHead>
+            <TableHead className="text-center hidden md:table-cell">Oposición</TableHead>
             <TableHead>Etapa</TableHead>
-            <TableHead className="text-right">Días</TableHead>
-            <TableHead />
+            <TableHead className="text-right hidden sm:table-cell w-[60px]">Días</TableHead>
+            <TableHead className="w-[60px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {matriculas.length === 0 && (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+              <TableCell colSpan={100} className="text-center py-12 text-muted-foreground">
                 No hay matrículas para mostrar
               </TableCell>
             </TableRow>
@@ -62,13 +62,15 @@ export default function MatriculaTable({
                 <TableCell className="font-mono text-sm font-medium">
                   {m.codigo}
                 </TableCell>
-                <TableCell>
-                  {comprador
-                    ? `${comprador.nombre} ${comprador.apellido}`
-                    : '—'}
+                <TableCell className="max-w-[140px]">
+                  <span className="truncate block">
+                    {comprador
+                      ? `${comprador.nombre} ${comprador.apellido}`
+                      : '—'}
+                  </span>
                 </TableCell>
-                <TableCell className="text-sm">{m.placa ?? '—'}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell className="text-sm hidden sm:table-cell">{m.placa ?? '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   {m.numero_credito ?? '—'}
                 </TableCell>
                 <TableCell className="text-center">
@@ -78,7 +80,7 @@ export default function MatriculaTable({
                     <XCircle className="h-4 w-4 text-red-400 mx-auto" />
                   )}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center hidden md:table-cell">
                   {!m.lleva_oposicion ? (
                     <span className="text-xs text-muted-foreground">N/A</span>
                   ) : m.fecha_oposicion ? (
@@ -90,13 +92,13 @@ export default function MatriculaTable({
                 <TableCell>
                   <EtapaBadge etapa={m.etapa} />
                 </TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">
+                <TableCell className="text-right text-sm text-muted-foreground hidden sm:table-cell">
                   {dias}d
                 </TableCell>
                 <TableCell>
                   <Link href={`/matriculas/${m.id}`}>
-                    <Button size="sm" variant="ghost" className="gap-1">
-                      Ver
+                    <Button size="sm" variant="ghost" className="gap-1 px-2">
+                      <span className="hidden sm:inline">Ver</span>
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </Link>

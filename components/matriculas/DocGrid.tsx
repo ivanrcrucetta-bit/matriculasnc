@@ -1,8 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { FileText, Eye, Trash2, Upload, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, Eye, Trash2, Upload, Loader2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import { eliminarDocumento } from '@/lib/actions'
@@ -17,9 +23,12 @@ const DOCS_PRINCIPALES: TipoDocumento[] = [
   'cedula_vendedor',
 ]
 
-interface DocGridProps {
-  matriculaId: string
-  documentos: Documento[]
+function esImagen(nombre: string) {
+  return /\.(jpe?g|png|webp)$/i.test(nombre)
+}
+
+function esPDF(nombre: string) {
+  return /\.pdf$/i.test(nombre)
 }
 
 function DocCard({
@@ -29,25 +38,32 @@ function DocCard({
   doc: Documento
   matriculaId: string
 }) {
-  const [loading, setLoading] = useState(false)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [loadingUrl, setLoadingUrl] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  async function handleVer() {
-    setLoading(true)
-    try {
-      const supabase = getSupabaseBrowser()
-      const { data, error } = await supabase.storage
-        .from('matriculas-docs')
-        .createSignedUrl(doc.storage_path, 3600)
+  const esImg = esImagen(doc.nombre_archivo)
+  const esPdf = esPDF(doc.nombre_archivo)
 
-      if (error || !data?.signedUrl) throw new Error('No se pudo generar el enlace')
-      window.open(data.signedUrl, '_blank')
-    } catch {
-      toast.error('Error al abrir el documento')
-    } finally {
-      setLoading(false)
+  // Load signed URL lazily on mount for thumbnail preview
+  useEffect(() => {
+    let cancelled = false
+    async function loadUrl() {
+      setLoadingUrl(true)
+      try {
+        const supabase = getSupabaseBrowser()
+        const { data } = await supabase.storage
+          .from('matriculas-docs')
+          .createSignedUrl(doc.storage_path, 3600)
+        if (!cancelled && data?.signedUrl) setSignedUrl(data.signedUrl)
+      } finally {
+        if (!cancelled) setLoadingUrl(false)
+      }
     }
-  }
+    loadUrl()
+    return () => { cancelled = true }
+  }, [doc.storage_path])
 
   async function handleEliminar() {
     if (!confirm('¿Eliminar este documento?')) return
@@ -63,49 +79,130 @@ function DocCard({
   }
 
   return (
-    <div className="border border-border rounded-lg p-4 bg-white space-y-3">
-      <div className="flex items-start gap-3">
-        <div className="p-2 bg-nc-green-light rounded-lg flex-shrink-0">
-          <FileText className="h-5 w-5 text-nc-green" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">
-            {TIPO_DOC_LABELS[doc.tipo]}
-          </p>
-          <p className="text-xs text-muted-foreground truncate" title={doc.nombre_archivo}>
-            {doc.nombre_archivo}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {formatFecha(doc.created_at)}
-          </p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleVer}
-          disabled={loading}
-          className="flex-1 gap-1"
-        >
-          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
-          Ver
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={handleEliminar}
-          disabled={deleting}
-          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-        >
-          {deleting ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+    <>
+      <div className="border border-border rounded-lg p-4 bg-white space-y-3">
+        <div className="flex items-start gap-3">
+          {/* Thumbnail para imágenes */}
+          {esImg && signedUrl ? (
+            <button
+              type="button"
+              onClick={() => setDialogOpen(true)}
+              className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={signedUrl}
+                alt={doc.nombre_archivo}
+                className="w-full h-full object-cover"
+              />
+            </button>
           ) : (
-            <Trash2 className="h-3 w-3" />
+            <div className="p-2 bg-nc-green-light rounded-lg flex-shrink-0 w-9 h-9 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-nc-green" />
+            </div>
           )}
-        </Button>
+
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900">
+              {TIPO_DOC_LABELS[doc.tipo]}
+            </p>
+            <p className="text-xs text-muted-foreground truncate" title={doc.nombre_archivo}>
+              {doc.nombre_archivo}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formatFecha(doc.created_at)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDialogOpen(true)}
+            disabled={loadingUrl || !signedUrl}
+            className="flex-1 gap-1"
+          >
+            {loadingUrl ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Eye className="h-3 w-3" />
+            )}
+            Ver
+          </Button>
+          {signedUrl && (
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              className="gap-1"
+            >
+              <a href={signedUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleEliminar}
+            disabled={deleting}
+            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+          >
+            {deleting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
       </div>
-    </div>
+
+      {/* Dialog de vista previa */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl w-full p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b">
+            <DialogTitle className="text-sm font-medium">
+              {TIPO_DOC_LABELS[doc.tipo]} · {doc.nombre_archivo}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[75vh]">
+            {signedUrl ? (
+              esImg ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={signedUrl}
+                  alt={doc.nombre_archivo}
+                  className="w-full object-contain"
+                />
+              ) : esPdf ? (
+                <iframe
+                  src={signedUrl}
+                  title={doc.nombre_archivo}
+                  className="w-full"
+                  style={{ height: '70vh', border: 'none' }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-40 text-muted-foreground">
+                  <a
+                    href={signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline text-sm"
+                  >
+                    Abrir archivo
+                  </a>
+                </div>
+              )
+            ) : (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -150,7 +247,7 @@ function DocSlotVacio({
   )
 }
 
-export default function DocGrid({ matriculaId, documentos }: DocGridProps) {
+export default function DocGrid({ matriculaId, documentos }: { matriculaId: string; documentos: Documento[] }) {
   const docsMap = new Map(documentos.map((d) => [d.tipo, d]))
 
   const otrosDocs = documentos.filter(
