@@ -5,10 +5,11 @@ import MatriculaForm from '@/components/matriculas/MatriculaForm'
 import type { Matricula, Persona } from '@/types'
 
 interface EditarPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function EditarMatriculaPage({ params }: EditarPageProps) {
+export default async function EditarMatriculaPage(props: EditarPageProps) {
+  const params = await props.params;
   const supabase = createSupabaseServer()
 
   const { data: mat } = await supabase

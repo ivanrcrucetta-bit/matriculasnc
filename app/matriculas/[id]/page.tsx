@@ -15,10 +15,11 @@ import { formatFecha } from '@/lib/fecha'
 import type { Matricula, Persona, Documento, EventoHistorial } from '@/types'
 
 interface DetallePageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function MatriculaDetallePage({ params }: DetallePageProps) {
+export default async function MatriculaDetallePage(props: DetallePageProps) {
+  const params = await props.params;
   const supabase = createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 

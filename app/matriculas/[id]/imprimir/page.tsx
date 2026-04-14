@@ -4,18 +4,19 @@ import PrintTrigger from './PrintTrigger'
 import type { Matricula, Persona, Documento } from '@/types'
 
 interface ImprimirPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 function esImagen(nombre: string) {
-  return /\.(jpe?g|png|webp)$/i.test(nombre)
+  return /\.(jpe?g|png|webp)$/i.test(nombre);
 }
 
 function esPDF(nombre: string) {
-  return /\.pdf$/i.test(nombre)
+  return /\.pdf$/i.test(nombre);
 }
 
-export default async function ImprimirPage({ params }: ImprimirPageProps) {
+export default async function ImprimirPage(props: ImprimirPageProps) {
+  const params = await props.params;
   const supabase = createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
@@ -66,7 +67,6 @@ export default async function ImprimirPage({ params }: ImprimirPageProps) {
   return (
     <>
       <PrintTrigger />
-
       {/* Botón flotante — oculto al imprimir */}
       <div className="print:hidden fixed top-4 right-4 z-50 flex gap-2">
         <button
@@ -82,7 +82,6 @@ export default async function ImprimirPage({ params }: ImprimirPageProps) {
           ← Volver
         </a>
       </div>
-
       <div className="bg-white min-h-screen">
         {/* Encabezado — visible en pantalla y en impresión */}
         <div
@@ -142,12 +141,12 @@ export default async function ImprimirPage({ params }: ImprimirPageProps) {
             {doc.signedUrl ? (
               esImagen(doc.nombre_archivo) ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                (<img
                   src={doc.signedUrl}
                   alt={doc.nombre_archivo}
                   className="w-full max-h-[85vh] object-contain"
                   style={{ maxHeight: '85vh' }}
-                />
+                />)
               ) : esPDF(doc.nombre_archivo) ? (
                 <iframe
                   src={doc.signedUrl}
@@ -176,5 +175,5 @@ export default async function ImprimirPage({ params }: ImprimirPageProps) {
         ))}
       </div>
     </>
-  )
+  );
 }

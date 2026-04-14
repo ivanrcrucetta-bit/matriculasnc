@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 
 import {
   getSupabasePublicEnv,
@@ -13,7 +13,7 @@ export function createSupabaseServer() {
     throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP}`)
   }
 
-  const cookieStore = cookies()
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies)
 
   return createServerClient(
     env.url,
@@ -44,7 +44,7 @@ export function createSupabaseServerAdmin() {
     throw new Error(`Invalid Supabase configuration. ${SUPABASE_ENV_HELP} Also set SUPABASE_SERVICE_ROLE_KEY for admin client.`)
   }
 
-  const cookieStore = cookies()
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies)
 
   return createServerClient(
     env.url,
