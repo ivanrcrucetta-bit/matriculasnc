@@ -160,7 +160,7 @@ function ExpedienteDocument({
               { label: 'Modelo', value: matricula.modelo ?? '—' },
               { label: 'Año', value: matricula.año?.toString() ?? '—' },
               { label: 'Color', value: matricula.color ?? '—' },
-              { label: 'Número de Crédito', value: matricula.numero_credito ?? '—' },
+              { label: 'Código cliente', value: matricula.numero_credito ?? '—' },
             ].map(({ label, value }) => (
               <View key={label} style={styles.campo}>
                 <Text style={styles.campoLabel}>{label}</Text>

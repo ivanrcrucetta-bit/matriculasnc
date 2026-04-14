@@ -356,11 +356,11 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-3xl">
-        {/* Sección 1: Crédito y vehículo */}
+        {/* Sección 1: Código cliente y vehículo */}
         <Card>
           <CardHeader className="pb-2">
             <SeccionHeader
-              titulo="Crédito y Vehículo"
+              titulo="Código cliente y Vehículo"
               open={secOpen.vehiculo}
               onToggle={() => toggle('vehiculo')}
             />
@@ -373,9 +373,9 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
                   name="numero_credito"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Número de Crédito</FormLabel>
+                      <FormLabel>Código cliente</FormLabel>
                       <FormControl>
-                        <Input placeholder="ej. CRD-2025-001" {...field} value={field.value ?? ''} />
+                        <Input placeholder="ej: (1234)" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

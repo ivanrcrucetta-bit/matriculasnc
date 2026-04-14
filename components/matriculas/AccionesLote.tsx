@@ -27,7 +27,7 @@ export default function AccionesLote({
   const seleccionadasData = matriculas.filter((m) => seleccionados.includes(m.id))
 
   function exportarCSV() {
-    const headers = ['Código', 'Placa', 'Cliente', 'Etapa', 'Crédito', 'Días']
+    const headers = ['Código', 'Placa', 'Cliente', 'Etapa', 'Cód. cliente', 'Días']
     const rows = seleccionadasData.map((m) => {
       const comprador = m.personas.find((p) => p.rol === 'comprador')
       return [

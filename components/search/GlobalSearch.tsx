@@ -65,7 +65,7 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder="Buscar placa, cédula, código NC, nombre, crédito…"
+        placeholder="Buscar placa, cédula, código NC, nombre, código cliente…"
         value={query}
         onValueChange={setQuery}
       />
@@ -116,7 +116,7 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
                           <span className="text-xs text-muted-foreground">{etapaInfo.label}</span>
                         )}
                         {m.numero_credito && (
-                          <span className="text-xs text-muted-foreground">· Créd: {m.numero_credito}</span>
+                          <span className="text-xs text-muted-foreground">· Cód. cliente: {m.numero_credito}</span>
                         )}
                       </div>
                     </div>

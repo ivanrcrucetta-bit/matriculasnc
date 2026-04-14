@@ -111,7 +111,7 @@ export default function MatriculaCardList({
 
                 {m.numero_credito && (
                   <span className="text-xs text-muted-foreground ml-auto">
-                    Créd: {m.numero_credito}
+                    Cód. cliente: {m.numero_credito}
                   </span>
                 )}
               </div>

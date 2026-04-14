@@ -86,7 +86,7 @@ export default function MatriculaTable({
               <TableHead className="w-[90px]">Código</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead className="hidden sm:table-cell">Placa</TableHead>
-              <TableHead className="hidden md:table-cell">Crédito</TableHead>
+              <TableHead className="hidden md:table-cell">Cód. cliente</TableHead>
               <TableHead className="hidden lg:table-cell">Documentos</TableHead>
               <TableHead className="text-center w-[60px] lg:hidden">Docs</TableHead>
               <TableHead className="text-center hidden md:table-cell">Oposición</TableHead>

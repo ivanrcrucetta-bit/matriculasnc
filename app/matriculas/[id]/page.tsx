@@ -131,7 +131,7 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                   { label: 'Modelo', value: matricula.modelo },
                   { label: 'Año', value: matricula.año?.toString() },
                   { label: 'Color', value: matricula.color },
-                  { label: 'Número de Crédito', value: matricula.numero_credito ?? null },
+                  { label: 'Código cliente', value: matricula.numero_credito ?? null },
                   { label: 'Fecha Oposición', value: formatFecha(matricula.fecha_oposicion) },
                   { label: 'Fecha Traspaso', value: formatFecha(matricula.fecha_traspaso) },
                 ].map(({ label, value }) => (
@@ -175,10 +175,10 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
               </div>
             )}
 
-            {/* Vinculación con crédito */}
+            {/* Información ampliada desde sistema de créditos */}
             {matricula.numero_credito && (
               <div className="bg-white border border-border rounded-lg p-6">
-                <h2 className="font-semibold text-gray-800 mb-3">Crédito vinculado</h2>
+                <h2 className="font-semibold text-gray-800 mb-3">Información del crédito</h2>
                 <CreditoInfoCard numeroCredito={matricula.numero_credito} />
               </div>
             )}
