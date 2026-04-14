@@ -10,7 +10,7 @@ interface EditarPageProps {
 
 export default async function EditarMatriculaPage(props: EditarPageProps) {
   const params = await props.params;
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
 
   const { data: mat } = await supabase
     .schema('matriculas' as 'public')

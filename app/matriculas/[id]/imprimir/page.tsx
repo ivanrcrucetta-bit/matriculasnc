@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import PrintTrigger from './PrintTrigger'
-import type { Matricula, Persona, Documento } from '@/types'
+import ExpedientePDF from '@/components/print/ExpedientePDF'
+import type { Matricula, Persona, Documento, EventoHistorial } from '@/types'
 
 interface ImprimirPageProps {
   params: Promise<{ id: string }>
@@ -17,10 +18,10 @@ function esPDF(nombre: string) {
 
 export default async function ImprimirPage(props: ImprimirPageProps) {
   const params = await props.params;
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
-  const [{ data: mat }, { data: personas }, { data: docs }] = await Promise.all([
+  const [{ data: mat }, { data: personas }, { data: docs }, { data: hist }] = await Promise.all([
     schema
       .from('matriculas' as never)
       .select('*')
@@ -35,6 +36,11 @@ export default async function ImprimirPage(props: ImprimirPageProps) {
       .select('*')
       .eq('matricula_id' as never, params.id)
       .order('created_at' as never, { ascending: false }),
+    schema
+      .from('historial' as never)
+      .select('*')
+      .eq('matricula_id' as never, params.id)
+      .order('created_at' as never, { ascending: false }),
   ])
 
   if (!mat) notFound()
@@ -42,6 +48,7 @@ export default async function ImprimirPage(props: ImprimirPageProps) {
   const matricula = mat as Matricula
   const personasList = (personas ?? []) as Persona[]
   const documentosList = (docs ?? []) as Documento[]
+  const historialList = (hist ?? []) as EventoHistorial[]
 
   const cliente = personasList.find((p) => p.rol === 'comprador')
 
@@ -69,6 +76,12 @@ export default async function ImprimirPage(props: ImprimirPageProps) {
       <PrintTrigger />
       {/* Botón flotante — oculto al imprimir */}
       <div className="print:hidden fixed top-4 right-4 z-50 flex gap-2">
+        <ExpedientePDF
+          matricula={matricula}
+          personas={personasList}
+          documentos={documentosList}
+          historial={historialList}
+        />
         <button
           onClick={() => window.print()}
           className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg shadow-lg hover:bg-gray-700 transition-colors"

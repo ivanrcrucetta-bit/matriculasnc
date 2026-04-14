@@ -32,7 +32,7 @@ interface PersonaAgrupada {
 }
 
 export default async function PersonasPage() {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
   const { data: personasData } = await schema

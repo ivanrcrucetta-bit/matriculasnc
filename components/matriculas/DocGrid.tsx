@@ -16,12 +16,16 @@ import { formatFecha } from '@/lib/fecha'
 import DocUploader from './DocUploader'
 import { TIPO_DOC_LABELS } from '@/types'
 import type { Documento, TipoDocumento } from '@/types'
+import { TIPOS_REQUERIDOS, TIPOS_ADICIONALES, TIPO_DOCUMENTO_INFO } from '@/lib/documentos'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
-const DOCS_PRINCIPALES: TipoDocumento[] = [
-  'copia_matricula',
-  'cedula_comprador',
-  'cedula_vendedor',
-]
+const DOCS_PRINCIPALES: TipoDocumento[] = TIPOS_REQUERIDOS
 
 function esImagen(nombre: string) {
   return /\.(jpe?g|png|webp)$/i.test(nombre)
@@ -275,10 +279,66 @@ export default function DocGrid({ matriculaId, documentos }: { matriculaId: stri
       </div>
 
       {/* Upload de documentos adicionales */}
-      <div className="pt-2">
-        <p className="text-xs text-muted-foreground mb-2">Documentos adicionales</p>
-        <DocUploader matriculaId={matriculaId} tipo="otro" />
-      </div>
+      <AgregarDocumentoAdicional matriculaId={matriculaId} tiposExistentes={documentos.map(d => d.tipo)} />
+    </div>
+  )
+}
+
+function AgregarDocumentoAdicional({
+  matriculaId,
+  tiposExistentes,
+}: {
+  matriculaId: string
+  tiposExistentes: TipoDocumento[]
+}) {
+  const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoDocumento>('otro')
+  const [mostrarUploader, setMostrarUploader] = useState(false)
+
+  const tiposDisponibles = TIPOS_ADICIONALES.filter(
+    (t) => !tiposExistentes.includes(t) || t === 'otro'
+  )
+
+  return (
+    <div className="pt-2 space-y-2">
+      <p className="text-xs text-muted-foreground">Agregar documento adicional</p>
+      <Select
+        value={tipoSeleccionado}
+        onValueChange={(v) => {
+          setTipoSeleccionado(v as TipoDocumento)
+          setMostrarUploader(false)
+        }}
+      >
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {tiposDisponibles.map((tipo) => (
+            <SelectItem key={tipo} value={tipo} className="text-xs">
+              <span className={`mr-1.5 text-xs font-medium ${TIPO_DOCUMENTO_INFO[tipo].textColor}`}>
+                ●
+              </span>
+              {TIPO_DOC_LABELS[tipo]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {mostrarUploader ? (
+        <DocUploader
+          matriculaId={matriculaId}
+          tipo={tipoSeleccionado}
+          onSuccess={() => setMostrarUploader(false)}
+        />
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setMostrarUploader(true)}
+          className="w-full gap-1 text-nc-green border-nc-green/30 hover:bg-nc-green-light"
+        >
+          <Upload className="h-3 w-3" />
+          Subir {TIPO_DOC_LABELS[tipoSeleccionado]}
+        </Button>
+      )}
     </div>
   )
 }

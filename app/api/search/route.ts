@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ matriculas: [], personas: [] })
   }
 
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
   const like = `%${q}%`
 

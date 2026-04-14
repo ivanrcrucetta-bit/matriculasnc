@@ -9,9 +9,10 @@ import VistaSwitcher from '@/components/matriculas/VistaSwitcher'
 import type { MatriculaConPersonas, TipoDocumento, DocResumen } from '@/types'
 import type { AlertaItem } from '@/components/matriculas/AlertasPendientes'
 import { diasDesde } from '@/lib/fecha'
+import { calcularAlertas, type SnoozeRecord } from '@/lib/alertas'
 
 async function getDatos() {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
   // Todas las matrículas con personas
@@ -27,7 +28,15 @@ async function getDatos() {
     .from('documentos' as never)
     .select('matricula_id, tipo, storage_path, nombre_archivo')
 
+  const { data: snoozeData } = await schema
+    .from('alertas_snooze' as never)
+    .select('matricula_id, tipo_alerta, snooze_until')
+    .gt('snooze_until' as never, new Date().toISOString())
+
+  const snoozes = (snoozeData ?? []) as SnoozeRecord[]
+
   const documentosPorMatricula: Record<string, DocResumen[]> = {}
+  const docsPorMat: Record<string, string[]> = {}
   for (const doc of (docs ?? []) as { matricula_id: string; tipo: TipoDocumento; storage_path: string; nombre_archivo: string }[]) {
     if (!documentosPorMatricula[doc.matricula_id]) {
       documentosPorMatricula[doc.matricula_id] = []
@@ -37,6 +46,8 @@ async function getDatos() {
       storage_path: doc.storage_path,
       nombre_archivo: doc.nombre_archivo,
     })
+    if (!docsPorMat[doc.matricula_id]) docsPorMat[doc.matricula_id] = []
+    docsPorMat[doc.matricula_id].push(doc.tipo)
   }
 
   // Stats
@@ -77,90 +88,18 @@ async function getDatos() {
     (m) => m.etapa !== 'cerrado' && diasDesde(m.updated_at) > 15
   ).length
 
-  // Alertas
-  const alertas: AlertaItem[] = []
+  // Alertas usando helper compartido
+  const alertasSeveridad = calcularAlertas(matriculas, docsPorMat, snoozes)
 
-  for (const m of matriculas) {
-    if (m.etapa === 'cerrado') continue
-    const comprador = m.personas?.find((p) => p.rol === 'comprador')
-    const nombreComprador = comprador
-      ? `${comprador.nombre} ${comprador.apellido}`
-      : '—'
-
-    const docsM = documentosPorMatricula[m.id] ?? []
-    const diasSinDoc = diasDesde(m.created_at)
-
-    if (
-      m.etapa === 'registrada' &&
-      docsM.length === 0 &&
-      diasSinDoc > 3
-    ) {
-      alertas.push({
-        id: m.id,
-        codigo: m.codigo,
-        placa: m.placa,
-        comprador: nombreComprador,
-        tipo: 'sin_docs',
-        diasTranscurridos: diasSinDoc,
-        updated_at: m.updated_at,
-      })
-    }
-
-    const diasActual = diasDesde(m.updated_at)
-
-    if (
-      m.lleva_oposicion &&
-      !m.fecha_oposicion &&
-      ['docs_completos', 'oposicion_pendiente'].includes(m.etapa) &&
-      diasActual > 5
-    ) {
-      alertas.push({
-        id: m.id,
-        codigo: m.codigo,
-        placa: m.placa,
-        comprador: nombreComprador,
-        tipo: 'oposicion_pendiente',
-        diasTranscurridos: diasActual,
-        updated_at: m.updated_at,
-      })
-    }
-
-    if (
-      m.lleva_traspaso &&
-      m.etapa === 'traspaso_en_proceso' &&
-      m.fecha_traspaso &&
-      diasDesde(m.fecha_traspaso) > 45
-    ) {
-      alertas.push({
-        id: m.id,
-        codigo: m.codigo,
-        placa: m.placa,
-        comprador: nombreComprador,
-        tipo: 'traspaso_lento',
-        diasTranscurridos: diasDesde(m.fecha_traspaso),
-        updated_at: m.updated_at,
-      })
-    }
-
-    if (diasActual > 15) {
-      alertas.push({
-        id: m.id,
-        codigo: m.codigo,
-        placa: m.placa,
-        comprador: nombreComprador,
-        tipo: 'sin_actividad',
-        diasTranscurridos: diasActual,
-        updated_at: m.updated_at,
-      })
-    }
-  }
-
-  // Deduplicar por id (priorizar la más crítica)
-  const alertasUnicas = alertas.reduce<AlertaItem[]>((acc, a) => {
-    const existe = acc.find((x) => x.id === a.id && x.tipo === a.tipo)
-    if (!existe) acc.push(a)
-    return acc
-  }, [])
+  const alertasUnicas: AlertaItem[] = alertasSeveridad.map((a) => ({
+    id: a.matricula_id,
+    codigo: a.codigo,
+    placa: a.placa,
+    comprador: a.comprador,
+    tipo: a.tipo,
+    diasTranscurridos: a.diasTranscurridos,
+    updated_at: a.updated_at,
+  }))
 
   return {
     matriculas,

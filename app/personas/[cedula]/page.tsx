@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import type { Etapa } from '@/types'
 
 interface Props {
-  params: { cedula: string }
+  params: Promise<{ cedula: string }>
 }
 
 interface PersonaMatricula {
@@ -32,9 +32,10 @@ interface PersonaMatricula {
   } | null
 }
 
-export default async function PersonaPerfilPage({ params }: Props) {
+export default async function PersonaPerfilPage(props: Props) {
+  const params = await props.params
   const cedula = decodeURIComponent(params.cedula)
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
   const { data: personasData } = await schema

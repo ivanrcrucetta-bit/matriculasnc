@@ -13,7 +13,7 @@ import { FileDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ETAPA_INFO, TIPO_DOC_LABELS } from '@/types'
-import type { Matricula, Persona, Documento, EventoHistorial } from '@/types'
+import type { Matricula, Persona, Documento, EventoHistorial, TipoDocumento } from '@/types'
 
 const styles = StyleSheet.create({
   page: {
@@ -125,12 +125,19 @@ function ExpedienteDocument({
   const tiposDoc = documentos.map((d) => d.tipo)
   const fechaGen = format(new Date(), "dd/MM/yyyy 'a las' HH:mm", { locale: es })
 
-  const DOCS_CHECKLIST = [
+  const DOCS_CHECKLIST: TipoDocumento[] = [
     'copia_matricula',
     'cedula_comprador',
     'cedula_vendedor',
     'contrato_venta',
-  ] as const
+    'fotocopia_matricula_vigente',
+    'comprobante_dgii',
+    'carta_credito',
+    'certificado_deuda',
+    'poder_notarial',
+    'carta_no_objecion',
+    'contrato_prenda',
+  ]
 
   return (
     <Document>

@@ -6,7 +6,7 @@ import {
   SUPABASE_ENV_HELP,
 } from '@/lib/supabase-env'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const env = getSupabasePublicEnv()
   if (!env) {
     if (process.env.NODE_ENV === 'development') {

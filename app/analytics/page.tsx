@@ -14,7 +14,7 @@ interface MatriculaRaw {
 }
 
 export default async function AnalyticsPage() {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
   const { data: matsData } = await schema

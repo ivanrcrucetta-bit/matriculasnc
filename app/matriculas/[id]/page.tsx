@@ -12,7 +12,9 @@ import PanelAcciones from '@/components/matriculas/PanelAcciones'
 import EtapaBadge from '@/components/matriculas/EtapaBadge'
 import { calcularBloqueos } from '@/lib/pipeline'
 import { formatFecha } from '@/lib/fecha'
-import type { Matricula, Persona, Documento, EventoHistorial } from '@/types'
+import NotasThread from '@/components/matriculas/NotasThread'
+import CreditoInfoCard from '@/components/matriculas/CreditoInfoCard'
+import type { Matricula, Persona, Documento, EventoHistorial, Nota } from '@/types'
 
 interface DetallePageProps {
   params: Promise<{ id: string }>
@@ -20,10 +22,10 @@ interface DetallePageProps {
 
 export default async function MatriculaDetallePage(props: DetallePageProps) {
   const params = await props.params;
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const schema = supabase.schema('matriculas' as 'public')
 
-  const [{ data: mat }, { data: personas }, { data: docs }, { data: hist }] = await Promise.all([
+  const [{ data: mat }, { data: personas }, { data: docs }, { data: hist }, { data: notasData }] = await Promise.all([
     schema
       .from('matriculas' as never)
       .select('*')
@@ -43,6 +45,11 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
       .select('*')
       .eq('matricula_id' as never, params.id)
       .order('created_at' as never, { ascending: false }),
+    schema
+      .from('notas' as never)
+      .select('*')
+      .eq('matricula_id' as never, params.id)
+      .order('created_at' as never, { ascending: false }),
   ])
 
   if (!mat) notFound()
@@ -51,6 +58,7 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
   const personasList = (personas ?? []) as Persona[]
   const documentosList = (docs ?? []) as Documento[]
   const historialList = (hist ?? []) as EventoHistorial[]
+  const notasList = (notasData ?? []) as Nota[]
 
   const comprador = personasList.find((p) => p.rol === 'comprador')
   const vendedor = personasList.find((p) => p.rol === 'vendedor')
@@ -123,7 +131,7 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                   { label: 'Modelo', value: matricula.modelo },
                   { label: 'Año', value: matricula.año?.toString() },
                   { label: 'Color', value: matricula.color },
-                  { label: 'Número de Crédito', value: matricula.numero_credito },
+                  { label: 'Número de Crédito', value: matricula.numero_credito ?? null },
                   { label: 'Fecha Oposición', value: formatFecha(matricula.fecha_oposicion) },
                   { label: 'Fecha Traspaso', value: formatFecha(matricula.fecha_traspaso) },
                 ].map(({ label, value }) => (
@@ -159,13 +167,26 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
               ) : null
             )}
 
-            {/* Notas */}
+            {/* Notas (campo legacy) */}
             {matricula.notas && (
               <div className="bg-white border border-border rounded-lg p-6">
-                <h2 className="font-semibold text-gray-800 mb-2">Notas</h2>
+                <h2 className="font-semibold text-gray-800 mb-2">Notas generales</h2>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{matricula.notas}</p>
               </div>
             )}
+
+            {/* Vinculación con crédito */}
+            {matricula.numero_credito && (
+              <div className="bg-white border border-border rounded-lg p-6">
+                <h2 className="font-semibold text-gray-800 mb-3">Crédito vinculado</h2>
+                <CreditoInfoCard numeroCredito={matricula.numero_credito} />
+              </div>
+            )}
+
+            {/* Notas internas */}
+            <div className="bg-white border border-border rounded-lg p-6">
+              <NotasThread matriculaId={params.id} notas={notasList} />
+            </div>
 
             {/* Timeline */}
             <div className="bg-white border border-border rounded-lg p-6">

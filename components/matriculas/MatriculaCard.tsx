@@ -5,6 +5,7 @@ import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { diasDesde } from '@/lib/fecha'
 import { ETAPA_INFO } from '@/types'
+import { calcularSLA, SLA_COLORS } from '@/lib/sla'
 import type { MatriculaConPersonas, DocResumen, TipoDocumento } from '@/types'
 import DocPreviewBadge from './DocPreviewBadge'
 
@@ -23,6 +24,7 @@ export default function MatriculaCard({ matricula, documentos }: MatriculaCardPr
   const info = ETAPA_INFO[matricula.etapa]
   const comprador = matricula.personas.find((p) => p.rol === 'comprador')
   const dias = diasDesde(matricula.updated_at)
+  const sla = calcularSLA(matricula.etapa, matricula.updated_at)
 
   const colorBorder: Record<string, string> = {
     gray: 'border-l-gray-300',
@@ -54,10 +56,22 @@ export default function MatriculaCard({ matricula, documentos }: MatriculaCardPr
               <p className="text-xs text-muted-foreground">{matricula.placa}</p>
             )}
           </div>
-          <span className="flex-shrink-0 text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {dias}d
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="flex-shrink-0 text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {dias}d
+            </span>
+            {sla.nivel !== 'none' && (
+              <span
+                className={cn(
+                  'text-[10px] px-1.5 py-0.5 rounded border font-medium leading-none',
+                  SLA_COLORS[sla.nivel]
+                )}
+              >
+                {sla.label}
+              </span>
+            )}
+          </div>
         </div>
 
         {comprador && (

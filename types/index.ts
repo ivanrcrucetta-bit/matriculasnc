@@ -15,6 +15,13 @@ export type TipoDocumento =
   | 'cedula_comprador'
   | 'cedula_vendedor'
   | 'contrato_venta'
+  | 'fotocopia_matricula_vigente'
+  | 'comprobante_dgii'
+  | 'carta_credito'
+  | 'certificado_deuda'
+  | 'poder_notarial'
+  | 'carta_no_objecion'
+  | 'contrato_prenda'
   | 'otro'
 
 export type TipoEvento =
@@ -159,6 +166,49 @@ export const ETAPA_INFO: Record<Etapa, EtapaInfo> = {
   },
 }
 
+// Composite types for people directory
+export interface PersonaConMatriculas extends Persona {
+  matriculas: Array<{
+    id: string
+    codigo: string
+    etapa: Etapa
+    placa: string | null
+    rol: RolPersona
+  }>
+}
+
+// Nota interna
+export interface Nota {
+  id: string
+  matricula_id: string
+  contenido: string
+  autor_nombre: string | null
+  created_at: string
+}
+
+// Alerta con severidad
+export type SeveridadAlerta = 'critica' | 'media' | 'baja'
+
+export interface AlertaSeveridad {
+  id: string
+  matricula_id: string
+  codigo: string
+  placa: string | null
+  comprador: string
+  tipo: 'sin_docs' | 'oposicion_pendiente' | 'traspaso_lento' | 'sin_actividad'
+  descripcion: string
+  diasTranscurridos: number
+  severidad: SeveridadAlerta
+  updated_at: string
+}
+
+// Credit linking
+export interface CreditoInfo {
+  numero_credito: string
+  estado: string | null
+  oficial: string | null
+}
+
 export const ETAPAS_ORDEN: Etapa[] = [
   'registrada',
   'docs_pendientes',
@@ -175,6 +225,13 @@ export const TIPO_DOC_LABELS: Record<TipoDocumento, string> = {
   cedula_comprador: 'Cédula Cliente',
   cedula_vendedor: 'Cédula Vendedor',
   contrato_venta: 'Contrato de Venta',
+  fotocopia_matricula_vigente: 'Fotocopia Matrícula Vigente',
+  comprobante_dgii: 'Comprobante DGII',
+  carta_credito: 'Carta de Crédito',
+  certificado_deuda: 'Certificado de Deuda',
+  poder_notarial: 'Poder Notarial',
+  carta_no_objecion: 'Carta de No Objeción',
+  contrato_prenda: 'Contrato de Prenda',
   otro: 'Otro',
 }
 

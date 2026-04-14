@@ -5,6 +5,7 @@ import { Columns3, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MatriculaKanban from './MatriculaKanban'
 import MatriculaTable from './MatriculaTable'
+import MatriculaCardList from './MatriculaCardList'
 import type { MatriculaConPersonas, DocResumen } from '@/types'
 
 type Vista = 'kanban' | 'tabla'
@@ -12,9 +13,10 @@ type Vista = 'kanban' | 'tabla'
 interface VistaSwitcherProps {
   matriculas: MatriculaConPersonas[]
   documentosPorMatricula: Record<string, DocResumen[]>
+  total?: number
 }
 
-export default function VistaSwitcher({ matriculas, documentosPorMatricula }: VistaSwitcherProps) {
+export default function VistaSwitcher({ matriculas, documentosPorMatricula, total }: VistaSwitcherProps) {
   const [vista, setVista] = useState<Vista>('kanban')
 
   useEffect(() => {
@@ -33,7 +35,12 @@ export default function VistaSwitcher({ matriculas, documentosPorMatricula }: Vi
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-800">
-          {matriculas.length} matrícula{matriculas.length !== 1 ? 's' : ''}
+          {total !== undefined ? total : matriculas.length} matrícula{(total ?? matriculas.length) !== 1 ? 's' : ''}
+          {total !== undefined && total !== matriculas.length && (
+            <span className="text-sm font-normal text-muted-foreground ml-1">
+              (mostrando {matriculas.length})
+            </span>
+          )}
         </h2>
         <div className="flex items-center border border-border rounded-lg overflow-hidden">
           <Button
@@ -63,10 +70,22 @@ export default function VistaSwitcher({ matriculas, documentosPorMatricula }: Vi
           documentosPorMatricula={documentosPorMatricula}
         />
       ) : (
-        <MatriculaTable
-          matriculas={matriculas}
-          documentosPorMatricula={documentosPorMatricula}
-        />
+        <>
+          {/* Tabla en desktop */}
+          <div className="hidden md:block">
+            <MatriculaTable
+              matriculas={matriculas}
+              documentosPorMatricula={documentosPorMatricula}
+            />
+          </div>
+          {/* Lista de cards en móvil */}
+          <div className="md:hidden">
+            <MatriculaCardList
+              matriculas={matriculas}
+              documentosPorMatricula={documentosPorMatricula}
+            />
+          </div>
+        </>
       )}
     </div>
   )

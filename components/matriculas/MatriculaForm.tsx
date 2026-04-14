@@ -149,7 +149,8 @@ function PersonaFields({
 }
 
 function DocFileSlot({
-  tipo,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  tipo: _tipo,
   label,
   file,
   onSelect,
@@ -254,6 +255,13 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
     cedula_comprador: null,
     cedula_vendedor: null,
     contrato_venta: null,
+    fotocopia_matricula_vigente: null,
+    comprobante_dgii: null,
+    carta_credito: null,
+    certificado_deuda: null,
+    poder_notarial: null,
+    carta_no_objecion: null,
+    contrato_prenda: null,
     otro: null,
   })
 

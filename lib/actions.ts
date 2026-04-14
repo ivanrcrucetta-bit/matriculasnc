@@ -1,18 +1,17 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import { calcularEtapa } from '@/lib/pipeline'
 import { formatISO } from '@/lib/fecha'
 import type { MatriculaFormValues } from '@/lib/validations'
-import type { Documento, Matricula, TipoDocumento, TipoEvento } from '@/types'
+import type { Documento, Etapa, Matricula, TipoDocumento, TipoEvento } from '@/types'
 
 const SCHEMA = 'matriculas'
 
 // Genera el código NC-YYYY-NNN via función SQL
 async function generarCodigo(): Promise<string> {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   // Intentar con schema option primero
   const { data, error } = await supabase
     .schema(SCHEMA as 'public')
@@ -38,7 +37,7 @@ async function generarCodigo(): Promise<string> {
 }
 
 async function registrarHistorial(
-  supabase: ReturnType<typeof createSupabaseServer>,
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
   matricula_id: string,
   tipo_evento: TipoEvento,
   descripcion: string,
@@ -56,7 +55,7 @@ async function registrarHistorial(
 }
 
 async function sincronizarEtapa(
-  supabase: ReturnType<typeof createSupabaseServer>,
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
   matriculaId: string
 ) {
   const { data: mat } = await supabase
@@ -101,7 +100,7 @@ async function sincronizarEtapa(
 export async function crearMatricula(
   values: MatriculaFormValues
 ): Promise<{ id: string }> {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
 
   const {
     data: { user },
@@ -178,7 +177,7 @@ export async function actualizarMatricula(
   id: string,
   values: Partial<MatriculaFormValues>
 ) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   const update: Record<string, unknown> = {
@@ -240,7 +239,7 @@ export async function subirDocumento(
   tipo: TipoDocumento,
   storageInfo: { nombre_archivo: string; storage_path: string }
 ) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -268,7 +267,7 @@ export async function subirDocumento(
 }
 
 export async function eliminarDocumento(matriculaId: string, documentoId: string, storagePath: string) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   // Eliminar de Storage
@@ -294,7 +293,7 @@ export async function eliminarDocumento(matriculaId: string, documentoId: string
 }
 
 export async function registrarOposicion(matriculaId: string, fecha: Date) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -317,7 +316,7 @@ export async function registrarOposicion(matriculaId: string, fecha: Date) {
 }
 
 export async function retirarOposicion(matriculaId: string) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -340,7 +339,7 @@ export async function retirarOposicion(matriculaId: string) {
 }
 
 export async function iniciarTraspaso(matriculaId: string, fecha: Date) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -366,7 +365,7 @@ export async function iniciarTraspaso(matriculaId: string, fecha: Date) {
 }
 
 export async function completarTraspaso(matriculaId: string) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -391,7 +390,7 @@ export async function completarTraspaso(matriculaId: string) {
 }
 
 export async function cerrarCaso(matriculaId: string) {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   await supabase
@@ -412,5 +411,80 @@ export async function cerrarCaso(matriculaId: string) {
   )
 
   revalidatePath(`/matriculas/${matriculaId}`)
+  revalidatePath('/')
+}
+
+export async function crearNota(matriculaId: string, contenido: string) {
+  const supabase = await createSupabaseServer()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  await supabase
+    .schema(SCHEMA as 'public')
+    .from('notas' as never)
+    .insert({
+      matricula_id: matriculaId,
+      contenido: contenido.trim(),
+      autor_nombre: user?.email ?? null,
+    } as never)
+
+  revalidatePath(`/matriculas/${matriculaId}`)
+}
+
+export async function cambiarEtapaMasivo(ids: string[], etapa: Etapa) {
+  const supabase = await createSupabaseServer()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  await supabase
+    .schema(SCHEMA as 'public')
+    .from('matriculas' as never)
+    .update({
+      etapa,
+      updated_by: user?.id ?? null,
+    } as never)
+    .in('id' as never, ids as never)
+
+  for (const id of ids) {
+    await registrarHistorial(
+      supabase,
+      id,
+      'cambio_etapa',
+      `Etapa actualizada masivamente a: ${etapa}`,
+      user?.email
+    )
+  }
+
+  revalidatePath('/matriculas')
+  revalidatePath('/')
+}
+
+export async function snoozeAlerta(
+  matriculaId: string,
+  tipoAlerta: string
+) {
+  const supabase = await createSupabaseServer()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const snoozeUntil = new Date()
+  snoozeUntil.setDate(snoozeUntil.getDate() + 3)
+
+  // Delete existing snooze for this matricula+tipo and insert new one
+  await supabase
+    .schema(SCHEMA as 'public')
+    .from('alertas_snooze' as never)
+    .delete()
+    .eq('matricula_id' as never, matriculaId)
+    .eq('tipo_alerta' as never, tipoAlerta)
+
+  await supabase
+    .schema(SCHEMA as 'public')
+    .from('alertas_snooze' as never)
+    .insert({
+      matricula_id: matriculaId,
+      tipo_alerta: tipoAlerta,
+      snooze_until: snoozeUntil.toISOString(),
+      created_by: user?.email ?? null,
+    } as never)
+
+  revalidatePath('/alertas')
   revalidatePath('/')
 }
