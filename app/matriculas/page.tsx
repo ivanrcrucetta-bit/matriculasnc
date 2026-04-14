@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import VistaSwitcher from '@/components/matriculas/VistaSwitcher'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, TipoDocumento, DocResumen } from '@/types'
 
 export default async function MatriculasPage() {
   const supabase = createSupabaseServer()
@@ -19,14 +19,18 @@ export default async function MatriculasPage() {
 
   const { data: docs } = await schema
     .from('documentos' as never)
-    .select('matricula_id, tipo')
+    .select('matricula_id, tipo, storage_path, nombre_archivo')
 
-  const documentosPorMatricula: Record<string, TipoDocumento[]> = {}
-  for (const doc of (docs ?? []) as { matricula_id: string; tipo: TipoDocumento }[]) {
+  const documentosPorMatricula: Record<string, DocResumen[]> = {}
+  for (const doc of (docs ?? []) as { matricula_id: string; tipo: TipoDocumento; storage_path: string; nombre_archivo: string }[]) {
     if (!documentosPorMatricula[doc.matricula_id]) {
       documentosPorMatricula[doc.matricula_id] = []
     }
-    documentosPorMatricula[doc.matricula_id].push(doc.tipo)
+    documentosPorMatricula[doc.matricula_id].push({
+      tipo: doc.tipo,
+      storage_path: doc.storage_path,
+      nombre_archivo: doc.nombre_archivo,
+    })
   }
 
   return (

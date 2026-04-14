@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatsCards from '@/components/matriculas/StatsCards'
 import AlertasPendientes from '@/components/matriculas/AlertasPendientes'
 import VistaSwitcher from '@/components/matriculas/VistaSwitcher'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, TipoDocumento, DocResumen } from '@/types'
 import type { AlertaItem } from '@/components/matriculas/AlertasPendientes'
 import { diasDesde } from '@/lib/fecha'
 
@@ -22,17 +22,21 @@ async function getDatos() {
 
   const matriculas = (mats ?? []) as MatriculaConPersonas[]
 
-  // Tipos de documentos por matrícula
+  // Documentos por matrícula (con datos para previsualización)
   const { data: docs } = await schema
     .from('documentos' as never)
-    .select('matricula_id, tipo')
+    .select('matricula_id, tipo, storage_path, nombre_archivo')
 
-  const documentosPorMatricula: Record<string, TipoDocumento[]> = {}
-  for (const doc of (docs ?? []) as { matricula_id: string; tipo: TipoDocumento }[]) {
+  const documentosPorMatricula: Record<string, DocResumen[]> = {}
+  for (const doc of (docs ?? []) as { matricula_id: string; tipo: TipoDocumento; storage_path: string; nombre_archivo: string }[]) {
     if (!documentosPorMatricula[doc.matricula_id]) {
       documentosPorMatricula[doc.matricula_id] = []
     }
-    documentosPorMatricula[doc.matricula_id].push(doc.tipo)
+    documentosPorMatricula[doc.matricula_id].push({
+      tipo: doc.tipo,
+      storage_path: doc.storage_path,
+      nombre_archivo: doc.nombre_archivo,
+    })
   }
 
   // Stats
@@ -50,7 +54,8 @@ async function getDatos() {
 
   const docsFaltantes = matriculas.filter((m) => {
     if (m.etapa === 'cerrado') return false
-    const tipos = documentosPorMatricula[m.id] ?? []
+    const docs = documentosPorMatricula[m.id] ?? []
+    const tipos = docs.map((d) => d.tipo)
     return (
       !tipos.includes('copia_matricula') ||
       !tipos.includes('cedula_comprador') ||
@@ -82,12 +87,12 @@ async function getDatos() {
       ? `${comprador.nombre} ${comprador.apellido}`
       : '—'
 
-    const tipos = documentosPorMatricula[m.id] ?? []
+    const docsM = documentosPorMatricula[m.id] ?? []
     const diasSinDoc = diasDesde(m.created_at)
 
     if (
       m.etapa === 'registrada' &&
-      tipos.length === 0 &&
+      docsM.length === 0 &&
       diasSinDoc > 3
     ) {
       alertas.push({

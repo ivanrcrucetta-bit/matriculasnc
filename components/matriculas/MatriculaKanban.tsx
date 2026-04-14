@@ -1,10 +1,10 @@
 import { ETAPA_INFO, ETAPAS_ORDEN } from '@/types'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, DocResumen } from '@/types'
 import MatriculaCard from './MatriculaCard'
 
 interface MatriculaKanbanProps {
   matriculas: MatriculaConPersonas[]
-  documentosPorMatricula: Record<string, TipoDocumento[]>
+  documentosPorMatricula: Record<string, DocResumen[]>
 }
 
 export default function MatriculaKanban({
@@ -53,7 +53,7 @@ export default function MatriculaKanban({
                 <MatriculaCard
                   key={m.id}
                   matricula={m}
-                  documentosTipos={documentosPorMatricula[m.id] ?? []}
+                  documentos={documentosPorMatricula[m.id] ?? []}
                 />
               ))}
               {items.length === 0 && (

@@ -82,6 +82,13 @@ export interface EventoHistorial {
   created_at: string
 }
 
+// Resumen de documento para uso en listas (sin cargar todos los campos)
+export interface DocResumen {
+  tipo: TipoDocumento
+  storage_path: string
+  nombre_archivo: string
+}
+
 // Tipo compuesto para listados y kanban
 export interface MatriculaConPersonas extends Matricula {
   personas: Persona[]

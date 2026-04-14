@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useRouter } from 'next/navigation'
+import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
-import { Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, Upload, X, FileText, ImageIcon, FileCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,14 +21,22 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { matriculaSchema, type MatriculaFormValues } from '@/lib/validations'
-import { crearMatricula, actualizarMatricula } from '@/lib/actions'
-import type { Matricula, Persona } from '@/types'
+import { crearMatricula, actualizarMatricula, subirDocumento } from '@/lib/actions'
+import { getSupabaseBrowser } from '@/lib/supabase'
+import { TIPO_DOC_LABELS } from '@/types'
+import type { Matricula, Persona, TipoDocumento } from '@/types'
 
 interface MatriculaFormProps {
   matricula?: Matricula
   personas?: Persona[]
   modo: 'crear' | 'editar'
 }
+
+const DOCS_FORM: { tipo: TipoDocumento; label: string }[] = [
+  { tipo: 'copia_matricula', label: 'Copia de Matrícula' },
+  { tipo: 'cedula_comprador', label: 'Cédula del Cliente' },
+  { tipo: 'cedula_vendedor', label: 'Cédula del Vendedor' },
+]
 
 function SeccionHeader({
   titulo,
@@ -138,7 +148,98 @@ function PersonaFields({
   )
 }
 
+function DocFileSlot({
+  tipo,
+  label,
+  file,
+  onSelect,
+  onRemove,
+}: {
+  tipo: TipoDocumento
+  label: string
+  file: File | null
+  onSelect: (f: File) => void
+  onRemove: () => void
+}) {
+  const onDrop = useCallback(
+    (accepted: File[]) => {
+      if (accepted[0]) onSelect(accepted[0])
+    },
+    [onSelect]
+  )
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 10 * 1024 * 1024,
+    multiple: false,
+  })
+
+  const esImagen = file && /\.(jpe?g|png)$/i.test(file.name)
+  const esPDF = file && /\.pdf$/i.test(file.name)
+  const preview = file && esImagen ? URL.createObjectURL(file) : null
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-gray-700">{label}</p>
+
+      {file ? (
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-nc-green-light border border-nc-green">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview}
+              alt={file.name}
+              className="w-10 h-10 object-cover rounded border border-nc-green/30 flex-shrink-0"
+            />
+          ) : esPDF ? (
+            <div className="w-10 h-10 flex items-center justify-center bg-red-50 rounded border border-red-200 flex-shrink-0">
+              <FileText className="h-5 w-5 text-red-500" />
+            </div>
+          ) : (
+            <div className="w-10 h-10 flex items-center justify-center bg-nc-green-light rounded border border-nc-green/30 flex-shrink-0">
+              <FileCheck className="h-5 w-5 text-nc-green" />
+            </div>
+          )}
+          <span className="flex-1 text-sm text-nc-green-dark truncate">{file.name}</span>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-red-500 flex-shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+            isDragActive
+              ? 'border-nc-green bg-nc-green-light'
+              : 'border-gray-200 hover:border-nc-green hover:bg-nc-green-light/40'
+          }`}
+        >
+          <input {...getInputProps()} />
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <Upload className="h-4 w-4" />
+            <span className="text-sm">
+              {isDragActive ? 'Suelta aquí' : 'Arrastra o haz click'}
+            </span>
+            <ImageIcon className="h-4 w-4" />
+          </div>
+          <p className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, PDF — máx. 10MB</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MatriculaForm({ matricula, personas, modo }: MatriculaFormProps) {
+  const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [secOpen, setSecOpen] = useState({
     vehiculo: true,
@@ -146,6 +247,14 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
     vendedor: true,
     docs: true,
     notas: true,
+  })
+
+  const [archivos, setArchivos] = useState<Record<TipoDocumento, File | null>>({
+    copia_matricula: null,
+    cedula_comprador: null,
+    cedula_vendedor: null,
+    contrato_venta: null,
+    otro: null,
   })
 
   const comprador = personas?.find((p) => p.rol === 'comprador')
@@ -182,32 +291,50 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
     },
   })
 
+  function setArchivo(tipo: TipoDocumento, file: File | null) {
+    setArchivos((prev) => ({ ...prev, [tipo]: file }))
+  }
+
   async function onSubmit(values: MatriculaFormValues) {
     setSaving(true)
     try {
       if (modo === 'crear') {
-        // Para crear: necesitamos un ID temporal para subir archivos
-        // Los docs se suben después de obtener el ID desde la action
-        // En este flujo los docs se pasan como metadata sin subir primero
-        // La action crea la matrícula y nos redirige al detalle
-        // Los docs se suben desde el detalle o aquí con un flujo 2-paso
+        const { id: matriculaId } = await crearMatricula(values)
 
-        // Flujo simplificado: crear matrícula primero, luego subir docs
-        // Para obtener el ID necesitamos crear sin docs y luego subirlos
-        // Esto requiere un intermediate step - usaremos la action sin docs
-        // y la redireccion al detalle donde se pueden subir
-        // 
-        // Si hay docs pendientes, los subimos después de crear via una ruta especial
-        // Por ahora pasamos empty y el usuario sube desde el detalle
+        // Subir archivos seleccionados
+        const supabase = getSupabaseBrowser()
+        const docsTipos = DOCS_FORM.map((d) => d.tipo)
 
-        await crearMatricula(values, [])
+        for (const tipo of docsTipos) {
+          const archivo = archivos[tipo]
+          if (!archivo) continue
+
+          const ts = Date.now()
+          const path = `${matriculaId}/${tipo}/${ts}_${archivo.name}`
+
+          const { error } = await supabase.storage
+            .from('matriculas-docs')
+            .upload(path, archivo)
+
+          if (error) {
+            toast.error(`Error al subir ${TIPO_DOC_LABELS[tipo]}: ${error.message}`)
+            continue
+          }
+
+          await subirDocumento(matriculaId, tipo, {
+            nombre_archivo: archivo.name,
+            storage_path: path,
+          })
+        }
+
+        router.push(`/matriculas/${matriculaId}`)
       } else if (matricula) {
         await actualizarMatricula(matricula.id, values)
         toast.success('Matrícula actualizada correctamente')
+        setSaving(false)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error inesperado'
-      // Si es un NEXT_REDIRECT no es un error real
       if (!msg.includes('NEXT_REDIRECT')) {
         toast.error(msg)
         setSaving(false)
@@ -438,6 +565,36 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
           )}
         </Card>
 
+        {/* Sección 4: Documentos (solo en modo crear) */}
+        {modo === 'crear' && (
+          <Card>
+            <CardHeader className="pb-2">
+              <SeccionHeader
+                titulo="Documentos (opcional)"
+                open={secOpen.docs}
+                onToggle={() => toggle('docs')}
+              />
+            </CardHeader>
+            {secOpen.docs && (
+              <CardContent className="space-y-5">
+                <p className="text-xs text-muted-foreground">
+                  Puedes subir los escaneos ahora (JPG, PNG o PDF) o agregarlos después desde el detalle de la matrícula.
+                </p>
+                {DOCS_FORM.map(({ tipo, label }) => (
+                  <DocFileSlot
+                    key={tipo}
+                    tipo={tipo}
+                    label={label}
+                    file={archivos[tipo]}
+                    onSelect={(f) => setArchivo(tipo, f)}
+                    onRemove={() => setArchivo(tipo, null)}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
         {/* Sección 5: Notas */}
         <Card>
           <CardHeader className="pb-2">
@@ -479,7 +636,7 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
+                {modo === 'crear' ? 'Creando...' : 'Guardando...'}
               </>
             ) : modo === 'crear' ? (
               'Crear Matrícula'

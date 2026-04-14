@@ -1,24 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { diasDesde } from '@/lib/fecha'
 import { ETAPA_INFO } from '@/types'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, DocResumen, TipoDocumento } from '@/types'
+import DocPreviewBadge from './DocPreviewBadge'
 
-const DOCS_MOSTRAR: TipoDocumento[] = [
-  'copia_matricula',
-  'cedula_comprador',
-  'cedula_vendedor',
+const DOCS_MOSTRAR: { tipo: TipoDocumento; short: string }[] = [
+  { tipo: 'copia_matricula', short: 'Matr.' },
+  { tipo: 'cedula_comprador', short: 'Ced. C' },
+  { tipo: 'cedula_vendedor', short: 'Ced. V' },
 ]
 
 interface MatriculaCardProps {
   matricula: MatriculaConPersonas
-  documentosTipos: TipoDocumento[]
+  documentos: DocResumen[]
 }
 
-export default function MatriculaCard({ matricula, documentosTipos }: MatriculaCardProps) {
+export default function MatriculaCard({ matricula, documentos }: MatriculaCardProps) {
   const info = ETAPA_INFO[matricula.etapa]
   const comprador = matricula.personas.find((p) => p.rol === 'comprador')
   const dias = diasDesde(matricula.updated_at)
@@ -33,6 +34,8 @@ export default function MatriculaCard({ matricula, documentosTipos }: MatriculaC
     emerald: 'border-l-emerald-500',
     slate: 'border-l-slate-400',
   }
+
+  const docsMap = new Map(documentos.map((d) => [d.tipo, d]))
 
   return (
     <Link href={`/matriculas/${matricula.id}`}>
@@ -63,36 +66,15 @@ export default function MatriculaCard({ matricula, documentosTipos }: MatriculaC
           </p>
         )}
 
-        {/* Indicadores de documentos */}
+        {/* Indicadores de documentos con preview al hacer click */}
         <div className="flex gap-2 flex-wrap">
-          {DOCS_MOSTRAR.map((tipo) => {
-            const tiene = documentosTipos.includes(tipo)
-            const shortLabel: Record<TipoDocumento, string> = {
-              copia_matricula: 'Matr.',
-              cedula_comprador: 'Ced. C',
-              cedula_vendedor: 'Ced. V',
-              contrato_venta: 'Contrato',
-              otro: 'Otro',
-            }
-            return (
-              <span
-                key={tipo}
-                className={cn(
-                  'flex items-center gap-1 text-xs px-1.5 py-0.5 rounded',
-                  tiene
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-red-50 text-red-600'
-                )}
-              >
-                {tiene ? (
-                  <CheckCircle className="h-3 w-3" />
-                ) : (
-                  <XCircle className="h-3 w-3" />
-                )}
-                {shortLabel[tipo]}
-              </span>
-            )
-          })}
+          {DOCS_MOSTRAR.map(({ tipo, short }) => (
+            <DocPreviewBadge
+              key={tipo}
+              doc={docsMap.get(tipo)}
+              shortLabel={short}
+            />
+          ))}
 
           {matricula.lleva_oposicion && (
             <span

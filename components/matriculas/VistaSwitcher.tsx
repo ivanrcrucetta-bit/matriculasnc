@@ -5,13 +5,13 @@ import { Columns3, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MatriculaKanban from './MatriculaKanban'
 import MatriculaTable from './MatriculaTable'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, DocResumen } from '@/types'
 
 type Vista = 'kanban' | 'tabla'
 
 interface VistaSwitcherProps {
   matriculas: MatriculaConPersonas[]
-  documentosPorMatricula: Record<string, TipoDocumento[]>
+  documentosPorMatricula: Record<string, DocResumen[]>
 }
 
 export default function VistaSwitcher({ matriculas, documentosPorMatricula }: VistaSwitcherProps) {

@@ -12,12 +12,27 @@ import {
 import { Button } from '@/components/ui/button'
 import { CheckCircle, XCircle, ExternalLink } from 'lucide-react'
 import EtapaBadge from './EtapaBadge'
+import DocPreviewBadge from './DocPreviewBadge'
 import { diasDesde } from '@/lib/fecha'
-import type { MatriculaConPersonas, TipoDocumento } from '@/types'
+import type { MatriculaConPersonas, DocResumen, TipoDocumento } from '@/types'
+
+const DOCS_PRINCIPALES: TipoDocumento[] = [
+  'copia_matricula',
+  'cedula_comprador',
+  'cedula_vendedor',
+]
+
+const DOC_SHORT: Record<TipoDocumento, string> = {
+  copia_matricula: 'Matr.',
+  cedula_comprador: 'Ced. C',
+  cedula_vendedor: 'Ced. V',
+  contrato_venta: 'Contrato',
+  otro: 'Otro',
+}
 
 interface MatriculaTableProps {
   matriculas: MatriculaConPersonas[]
-  documentosPorMatricula: Record<string, TipoDocumento[]>
+  documentosPorMatricula: Record<string, DocResumen[]>
 }
 
 export default function MatriculaTable({
@@ -33,7 +48,8 @@ export default function MatriculaTable({
             <TableHead>Cliente</TableHead>
             <TableHead className="hidden sm:table-cell">Placa</TableHead>
             <TableHead className="hidden md:table-cell">Crédito</TableHead>
-            <TableHead className="text-center w-[60px]">Docs</TableHead>
+            <TableHead className="hidden lg:table-cell">Documentos</TableHead>
+            <TableHead className="text-center w-[60px] lg:hidden">Docs</TableHead>
             <TableHead className="text-center hidden md:table-cell">Oposición</TableHead>
             <TableHead>Etapa</TableHead>
             <TableHead className="text-right hidden sm:table-cell w-[60px]">Días</TableHead>
@@ -50,11 +66,9 @@ export default function MatriculaTable({
           )}
           {matriculas.map((m) => {
             const comprador = m.personas.find((p) => p.rol === 'comprador')
-            const tipos = documentosPorMatricula[m.id] ?? []
-            const docsOk =
-              tipos.includes('copia_matricula') &&
-              tipos.includes('cedula_comprador') &&
-              tipos.includes('cedula_vendedor')
+            const docs = documentosPorMatricula[m.id] ?? []
+            const docsMap = new Map(docs.map((d) => [d.tipo, d]))
+            const docsOk = DOCS_PRINCIPALES.every((t) => docsMap.has(t))
             const dias = diasDesde(m.updated_at)
 
             return (
@@ -73,13 +87,32 @@ export default function MatriculaTable({
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   {m.numero_credito ?? '—'}
                 </TableCell>
-                <TableCell className="text-center">
+
+                {/* Columna expandida con badges clicables (pantallas grandes) */}
+                <TableCell className="hidden lg:table-cell">
+                  <div
+                    className="flex gap-1.5 flex-wrap"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {DOCS_PRINCIPALES.map((tipo) => (
+                      <DocPreviewBadge
+                        key={tipo}
+                        doc={docsMap.get(tipo)}
+                        shortLabel={DOC_SHORT[tipo]}
+                      />
+                    ))}
+                  </div>
+                </TableCell>
+
+                {/* Columna compacta ✓/✗ (pantallas pequeñas) */}
+                <TableCell className="text-center lg:hidden">
                   {docsOk ? (
                     <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
                   ) : (
                     <XCircle className="h-4 w-4 text-red-400 mx-auto" />
                   )}
                 </TableCell>
+
                 <TableCell className="text-center hidden md:table-cell">
                   {!m.lleva_oposicion ? (
                     <span className="text-xs text-muted-foreground">N/A</span>

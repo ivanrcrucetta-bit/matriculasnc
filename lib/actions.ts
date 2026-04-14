@@ -99,13 +99,8 @@ async function sincronizarEtapa(
 }
 
 export async function crearMatricula(
-  values: MatriculaFormValues,
-  documentosData: {
-    tipo: TipoDocumento
-    nombre_archivo: string
-    storage_path: string
-  }[]
-) {
+  values: MatriculaFormValues
+): Promise<{ id: string }> {
   const supabase = createSupabaseServer()
 
   const {
@@ -161,22 +156,6 @@ export async function crearMatricula(
       },
     ] as never)
 
-  // Insertar documentos si los hay
-  if (documentosData.length > 0) {
-    await supabase
-      .schema(SCHEMA as 'public')
-      .from('documentos' as never)
-      .insert(
-        documentosData.map((d) => ({
-          matricula_id,
-          tipo: d.tipo,
-          nombre_archivo: d.nombre_archivo,
-          storage_path: d.storage_path,
-          subido_por: user?.id ?? null,
-        })) as never
-      )
-  }
-
   // Historial de creación
   await registrarHistorial(
     supabase,
@@ -191,7 +170,8 @@ export async function crearMatricula(
 
   revalidatePath('/')
   revalidatePath('/matriculas')
-  redirect(`/matriculas/${matricula_id}`)
+
+  return { id: matricula_id }
 }
 
 export async function actualizarMatricula(
