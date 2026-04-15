@@ -221,8 +221,8 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
       <div className="hidden print:block">
         <div
           style={{
-            width: '9.5in',
-            height: '4.125in',
+            width: '9.4in',
+            height: '4.3in',
             border: '1px solid #ccc',
             position: 'relative',
             padding: '0.5in',
@@ -230,15 +230,6 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
             fontSize: '12pt',
           }}
         >
-          {/* Remitente */}
-          <div style={{ position: 'absolute', top: '0.5in', left: '0.5in' }}>
-            <div style={{ fontWeight: 'bold' }}>
-              {process.env.NEXT_PUBLIC_OFICINA_NOMBRE}
-            </div>
-            <div>{process.env.NEXT_PUBLIC_OFICINA_DIRECCION}</div>
-            <div>{process.env.NEXT_PUBLIC_OFICINA_TELEFONO}</div>
-          </div>
-
           {/* Destinatario */}
           <div
             style={{
@@ -253,8 +244,11 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                 <div style={{ fontWeight: 'bold', fontSize: '14pt' }}>
                   {comprador.nombre} {comprador.apellido}
                 </div>
-                {comprador.direccion && <div>{comprador.direccion}</div>}
-                <div>República Dominicana</div>
+                {matricula.numero_credito && (
+                  <div style={{ fontSize: '11pt', color: '#555' }}>
+                    Cód. cliente: {matricula.numero_credito}
+                  </div>
+                )}
               </>
             )}
             {(matricula.marca || matricula.modelo) && (
@@ -264,23 +258,6 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                   .join(' · ')}
               </div>
             )}
-          </div>
-
-          {/* Referencia */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '0.5in',
-              left: '0.5in',
-              right: '0.5in',
-              fontSize: '10pt',
-              color: '#555',
-              borderTop: '1px solid #ccc',
-              paddingTop: '0.2in',
-            }}
-          >
-            Ref: {matricula.codigo}
-            {matricula.placa ? ` | Placa: ${matricula.placa}` : ''}
           </div>
         </div>
       </div>
