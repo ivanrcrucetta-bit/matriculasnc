@@ -134,26 +134,45 @@ export async function crearMatricula(
 
   const { id: matricula_id } = mat as { id: string }
 
-  // Insertar comprador y vendedor
+  const compradorRow = {
+    matricula_id,
+    rol: 'comprador',
+    ...values.comprador,
+    cedula: values.comprador.cedula || null,
+    telefono: values.comprador.telefono || null,
+    provincia: values.comprador.provincia || null,
+    municipio: values.comprador.municipio || null,
+    sector: values.comprador.sector || null,
+  }
+
+  const vendedorTieneDatos = values.vendedor &&
+    [values.vendedor.nombre, values.vendedor.apellido, values.vendedor.cedula,
+     values.vendedor.telefono, values.vendedor.provincia, values.vendedor.municipio, values.vendedor.sector]
+      .some((v) => v && v.trim().length > 0)
+
+  const filas = vendedorTieneDatos
+    ? [
+        compradorRow,
+        {
+          matricula_id,
+          rol: 'vendedor',
+          ...values.vendedor,
+          nombre: values.vendedor!.nombre || '',
+          apellido: values.vendedor!.apellido || '',
+          cedula: values.vendedor!.cedula || null,
+          telefono: values.vendedor!.telefono || null,
+          provincia: values.vendedor!.provincia || null,
+          municipio: values.vendedor!.municipio || null,
+          sector: values.vendedor!.sector || null,
+        },
+      ]
+    : [compradorRow]
+
+  // Insertar comprador (y vendedor si tiene datos)
   await supabase
     .schema(SCHEMA as 'public')
     .from('personas' as never)
-    .insert([
-      {
-        matricula_id,
-        rol: 'comprador',
-        ...values.comprador,
-        cedula: values.comprador.cedula || null,
-        telefono: values.comprador.telefono || null,
-      },
-      {
-        matricula_id,
-        rol: 'vendedor',
-        ...values.vendedor,
-        cedula: values.vendedor.cedula || null,
-        telefono: values.vendedor.telefono || null,
-      },
-    ] as never)
+    .insert(filas as never)
 
   // Historial de creación
   await registrarHistorial(
@@ -209,22 +228,57 @@ export async function actualizarMatricula(
         ...values.comprador,
         cedula: values.comprador.cedula || null,
         telefono: values.comprador.telefono || null,
+        provincia: values.comprador.provincia || null,
+        municipio: values.comprador.municipio || null,
+        sector: values.comprador.sector || null,
       } as never)
       .eq('matricula_id' as never, id)
       .eq('rol' as never, 'comprador')
   }
 
   if (values.vendedor) {
-    await supabase
-      .schema(SCHEMA as 'public')
-      .from('personas' as never)
-      .update({
-        ...values.vendedor,
+    const vendTieneDatos = [values.vendedor.nombre, values.vendedor.apellido,
+      values.vendedor.cedula, values.vendedor.telefono,
+      values.vendedor.provincia, values.vendedor.municipio, values.vendedor.sector]
+        .some((v) => v && v.trim().length > 0)
+
+    if (vendTieneDatos) {
+      // Verificar si ya existe fila de vendedor
+      const { data: existente } = await supabase
+        .schema(SCHEMA as 'public')
+        .from('personas' as never)
+        .select('id')
+        .eq('matricula_id' as never, id)
+        .eq('rol' as never, 'vendedor')
+        .maybeSingle()
+
+      const vendedorPayload = {
+        matricula_id: id,
+        rol: 'vendedor',
+        nombre: values.vendedor.nombre || '',
+        apellido: values.vendedor.apellido || '',
         cedula: values.vendedor.cedula || null,
         telefono: values.vendedor.telefono || null,
-      } as never)
-      .eq('matricula_id' as never, id)
-      .eq('rol' as never, 'vendedor')
+        direccion: values.vendedor.direccion || null,
+        provincia: values.vendedor.provincia || null,
+        municipio: values.vendedor.municipio || null,
+        sector: values.vendedor.sector || null,
+      }
+
+      if (existente) {
+        await supabase
+          .schema(SCHEMA as 'public')
+          .from('personas' as never)
+          .update(vendedorPayload as never)
+          .eq('matricula_id' as never, id)
+          .eq('rol' as never, 'vendedor')
+      } else {
+        await supabase
+          .schema(SCHEMA as 'public')
+          .from('personas' as never)
+          .insert(vendedorPayload as never)
+      }
+    }
   }
 
   await registrarHistorial(supabase, id, 'nota_agregada', 'Datos de la matrícula actualizados', user?.email)

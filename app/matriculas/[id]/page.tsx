@@ -131,7 +131,6 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                   { label: 'Modelo', value: matricula.modelo },
                   { label: 'Año', value: matricula.año?.toString() },
                   { label: 'Color', value: matricula.color },
-                  { label: 'Código cliente', value: matricula.numero_credito ?? null },
                   { label: 'Fecha Oposición', value: formatFecha(matricula.fecha_oposicion) },
                   { label: 'Fecha Traspaso', value: formatFecha(matricula.fecha_traspaso) },
                 ].map(({ label, value }) => (
@@ -152,10 +151,19 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                   </h2>
                   <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                     {[
+                      ...(persona.rol === 'comprador' && matricula.numero_credito
+                        ? [{ label: 'Código cliente', value: matricula.numero_credito }]
+                        : []),
                       { label: 'Nombre', value: `${persona.nombre} ${persona.apellido}` },
                       { label: 'Cédula', value: persona.cedula },
                       { label: 'Teléfono', value: persona.telefono },
-                      { label: 'Dirección', value: persona.direccion },
+                      ...(persona.provincia
+                        ? [
+                            { label: 'Provincia', value: persona.provincia },
+                            { label: 'Municipio', value: persona.municipio },
+                            { label: 'Sector / Calle', value: persona.sector },
+                          ]
+                        : [{ label: 'Dirección', value: persona.direccion }]),
                     ].map(({ label, value }) => (
                       <div key={label}>
                         <dt className="text-muted-foreground">{label}</dt>

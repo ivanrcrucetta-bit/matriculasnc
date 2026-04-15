@@ -67,6 +67,9 @@ export interface Persona {
   cedula: string | null
   telefono: string | null
   direccion: string | null
+  provincia: string | null
+  municipio: string | null
+  sector: string | null
   created_at: string
 }
 

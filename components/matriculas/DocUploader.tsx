@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import { subirDocumento } from '@/lib/actions'
+import { procesarImagen, esImagen } from '@/lib/imagen-canvas'
 import type { TipoDocumento } from '@/types'
 import { TIPO_DOC_LABELS } from '@/types'
 
@@ -21,8 +22,20 @@ export default function DocUploader({ matriculaId, tipo, onSuccess }: DocUploade
   const [archivo, setArchivo] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
 
-  const onDrop = useCallback((accepted: File[]) => {
-    if (accepted.length > 0) setArchivo(accepted[0])
+  // Bug 3 fix: try-catch con feedback al usuario si falla el procesamiento
+  const onDrop = useCallback(async (accepted: File[]) => {
+    if (accepted.length === 0) return
+    const raw = accepted[0]
+    if (esImagen(raw)) {
+      try {
+        const optimizado = await procesarImagen(raw)
+        setArchivo(optimizado)
+      } catch {
+        toast.error('No se pudo procesar la imagen. Intenta con otro archivo.')
+      }
+    } else {
+      setArchivo(raw)
+    }
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

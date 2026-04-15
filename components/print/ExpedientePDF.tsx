@@ -160,7 +160,6 @@ function ExpedienteDocument({
               { label: 'Modelo', value: matricula.modelo ?? '—' },
               { label: 'Año', value: matricula.año?.toString() ?? '—' },
               { label: 'Color', value: matricula.color ?? '—' },
-              { label: 'Código cliente', value: matricula.numero_credito ?? '—' },
             ].map(({ label, value }) => (
               <View key={label} style={styles.campo}>
                 <Text style={styles.campoLabel}>{label}</Text>
@@ -176,10 +175,15 @@ function ExpedienteDocument({
             <Text style={styles.seccionTitulo}>Cliente</Text>
             <View style={styles.grid2}>
               {[
+                { label: 'Código cliente', value: matricula.numero_credito ?? '—' },
                 { label: 'Nombre', value: `${comprador.nombre} ${comprador.apellido}` },
                 { label: 'Cédula', value: comprador.cedula ?? '—' },
                 { label: 'Teléfono', value: comprador.telefono ?? '—' },
-                { label: 'Dirección', value: comprador.direccion ?? '—' },
+                {
+                  label: 'Dirección',
+                  value: [comprador.sector, comprador.municipio, comprador.provincia]
+                    .filter(Boolean).join(', ') || comprador.direccion || '—',
+                },
               ].map(({ label, value }) => (
                 <View key={label} style={styles.campo}>
                   <Text style={styles.campoLabel}>{label}</Text>
@@ -199,7 +203,11 @@ function ExpedienteDocument({
                 { label: 'Nombre', value: `${vendedor.nombre} ${vendedor.apellido}` },
                 { label: 'Cédula', value: vendedor.cedula ?? '—' },
                 { label: 'Teléfono', value: vendedor.telefono ?? '—' },
-                { label: 'Dirección', value: vendedor.direccion ?? '—' },
+                {
+                  label: 'Dirección',
+                  value: [vendedor.sector, vendedor.municipio, vendedor.provincia]
+                    .filter(Boolean).join(', ') || vendedor.direccion || '—',
+                },
               ].map(({ label, value }) => (
                 <View key={label} style={styles.campo}>
                   <Text style={styles.campoLabel}>{label}</Text>

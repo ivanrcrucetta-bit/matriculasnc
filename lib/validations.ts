@@ -14,6 +14,30 @@ export const personaSchema = z.object({
   cedula: z.union([cedulaRD, z.literal('')]).optional(),
   telefono: z.union([telefonoRD, z.literal('')]).optional(),
   direccion: z.string().optional(),
+  provincia: z.string().optional(),
+  municipio: z.string().optional(),
+  sector: z.string().optional(),
+})
+
+export const vendedorSchema = z.object({
+  nombre: z.string().optional(),
+  apellido: z.string().optional(),
+  cedula: z.union([cedulaRD, z.literal('')]).optional(),
+  telefono: z.union([telefonoRD, z.literal('')]).optional(),
+  direccion: z.string().optional(),
+  provincia: z.string().optional(),
+  municipio: z.string().optional(),
+  sector: z.string().optional(),
+}).superRefine((val, ctx) => {
+  const tieneDatos = [val.nombre, val.apellido, val.cedula, val.telefono, val.provincia, val.municipio, val.sector]
+    .some((v) => v && v.trim().length > 0)
+  if (!tieneDatos) return
+  if (!val.nombre || val.nombre.trim().length < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Requerido (mínimo 2 caracteres)', path: ['nombre'] })
+  }
+  if (!val.apellido || val.apellido.trim().length < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Requerido (mínimo 2 caracteres)', path: ['apellido'] })
+  }
 })
 
 export const matriculaSchema = z.object({
@@ -23,17 +47,18 @@ export const matriculaSchema = z.object({
   chasis: z.string().optional(),
   marca: z.string().optional(),
   modelo: z.string().optional(),
-  año: z.number().int().min(1990, 'Año mínimo: 1990').max(2030, 'Año máximo: 2030').optional(),
+  año: z.number().int().min(1900, 'Año mínimo: 1900').max(new Date().getFullYear() + 1, `Año máximo: ${new Date().getFullYear() + 1}`).optional(),
   color: z.string().optional(),
   lleva_traspaso: z.boolean(),
   lleva_oposicion: z.boolean(),
   notas: z.string().optional(),
   comprador: personaSchema,
-  vendedor: personaSchema,
+  vendedor: vendedorSchema,
 })
 
 export type MatriculaFormValues = z.infer<typeof matriculaSchema>
 export type PersonaFormValues = z.infer<typeof personaSchema>
+export type VendedorFormValues = z.infer<typeof vendedorSchema>
 
 export const oposicionSchema = z.object({
   fecha_oposicion: z.date({ error: 'La fecha es requerida' }),

@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
-import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
-import { Loader2, ChevronDown, ChevronUp, Upload, X, FileText, ImageIcon, FileCheck } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,11 +19,21 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { matriculaSchema, type MatriculaFormValues } from '@/lib/validations'
 import { crearMatricula, actualizarMatricula, subirDocumento } from '@/lib/actions'
 import { getSupabaseBrowser } from '@/lib/supabase'
+import { formatCedulaRD, formatTelefonoRD } from '@/lib/format-rd'
+import { PROVINCIAS_RD, getMunicipios } from '@/lib/data/rd-provincias-municipios'
 import { TIPO_DOC_LABELS } from '@/types'
 import type { Matricula, Persona, TipoDocumento } from '@/types'
+import DocumentoFilePicker from './DocumentoFilePicker'
 
 interface MatriculaFormProps {
   matricula?: Matricula
@@ -38,12 +47,18 @@ const DOCS_FORM: { tipo: TipoDocumento; label: string }[] = [
   { tipo: 'cedula_vendedor', label: 'Cédula del Vendedor' },
 ]
 
+// ---------------------------------------------------------------------------
+// Componentes internos
+// ---------------------------------------------------------------------------
+
 function SeccionHeader({
   titulo,
+  subtitulo,
   open,
   onToggle,
 }: {
   titulo: string
+  subtitulo?: string
   open: boolean
   onToggle: () => void
 }) {
@@ -53,7 +68,12 @@ function SeccionHeader({
       onClick={onToggle}
       className="w-full flex items-center justify-between py-1 text-left"
     >
-      <span className="font-semibold text-gray-800">{titulo}</span>
+      <div>
+        <span className="font-semibold text-gray-800">{titulo}</span>
+        {subtitulo && (
+          <span className="ml-2 text-xs text-muted-foreground font-normal">{subtitulo}</span>
+        )}
+      </div>
       {open ? (
         <ChevronUp className="h-4 w-4 text-muted-foreground" />
       ) : (
@@ -72,20 +92,20 @@ function PersonaFields({
   prefix: 'comprador' | 'vendedor'
   titulo: string
 }) {
+  const provinciaSeleccionada = form.watch(`${prefix}.provincia` as `comprador.provincia`)
+
   return (
     <div className="space-y-4">
-      <h3 className="font-medium text-gray-700 text-sm uppercase tracking-wide">
-        {titulo}
-      </h3>
+      <h3 className="font-medium text-gray-700 text-sm uppercase tracking-wide">{titulo}</h3>
       <div className="grid grid-cols-2 gap-4">
         <FormField
           control={form.control}
-          name={`${prefix}.nombre`}
+          name={`${prefix}.nombre` as `comprador.nombre`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre</FormLabel>
               <FormControl>
-                <Input placeholder="Juan" {...field} />
+                <Input placeholder="Juan" {...field} value={field.value ?? ''} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -93,12 +113,12 @@ function PersonaFields({
         />
         <FormField
           control={form.control}
-          name={`${prefix}.apellido`}
+          name={`${prefix}.apellido` as `comprador.apellido`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Apellido</FormLabel>
               <FormControl>
-                <Input placeholder="Pérez" {...field} />
+                <Input placeholder="Pérez" {...field} value={field.value ?? ''} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -106,12 +126,19 @@ function PersonaFields({
         />
         <FormField
           control={form.control}
-          name={`${prefix}.cedula`}
+          name={`${prefix}.cedula` as `comprador.cedula`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cédula</FormLabel>
               <FormControl>
-                <Input placeholder="001-0000000-0" {...field} value={field.value ?? ''} />
+                <Input
+                  placeholder="001-0000000-0"
+                  {...field}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(formatCedulaRD(e.target.value))}
+                  maxLength={13}
+                  inputMode="numeric"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -119,26 +146,98 @@ function PersonaFields({
         />
         <FormField
           control={form.control}
-          name={`${prefix}.telefono`}
+          name={`${prefix}.telefono` as `comprador.telefono`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Teléfono</FormLabel>
               <FormControl>
-                <Input placeholder="809-000-0000" {...field} value={field.value ?? ''} />
+                <Input
+                  placeholder="809-000-0000"
+                  {...field}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(formatTelefonoRD(e.target.value))}
+                  maxLength={12}
+                  inputMode="numeric"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
       </div>
+
+      {/* Dirección en cascada */}
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name={`${prefix}.provincia` as `comprador.provincia`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Provincia</FormLabel>
+              <Select
+                value={field.value ?? ''}
+                onValueChange={(val) => {
+                  field.onChange(val)
+                  form.setValue(`${prefix}.municipio` as `comprador.municipio`, '')
+                }}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona provincia" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {PROVINCIAS_RD.map((p) => (
+                    <SelectItem key={p.nombre} value={p.nombre}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`${prefix}.municipio` as `comprador.municipio`}
+          render={({ field }) => {
+            const municipios = getMunicipios(provinciaSeleccionada ?? '')
+            return (
+              <FormItem>
+                <FormLabel>Municipio</FormLabel>
+                <Select
+                  value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  disabled={!provinciaSeleccionada}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={provinciaSeleccionada ? 'Selecciona municipio' : 'Elige provincia primero'} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {municipios.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )
+          }}
+        />
+      </div>
       <FormField
         control={form.control}
-        name={`${prefix}.direccion`}
+        name={`${prefix}.sector` as `comprador.sector`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Dirección</FormLabel>
+            <FormLabel>Sector / Calle</FormLabel>
             <FormControl>
-              <Input placeholder="Calle, sector, ciudad" {...field} value={field.value ?? ''} />
+              <Input placeholder="Ensanche Naco, Calle Principal #5" {...field} value={field.value ?? ''} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -148,96 +247,9 @@ function PersonaFields({
   )
 }
 
-function DocFileSlot({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  tipo: _tipo,
-  label,
-  file,
-  onSelect,
-  onRemove,
-}: {
-  tipo: TipoDocumento
-  label: string
-  file: File | null
-  onSelect: (f: File) => void
-  onRemove: () => void
-}) {
-  const onDrop = useCallback(
-    (accepted: File[]) => {
-      if (accepted[0]) onSelect(accepted[0])
-    },
-    [onSelect]
-  )
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-    },
-    maxSize: 10 * 1024 * 1024,
-    multiple: false,
-  })
-
-  const esImagen = file && /\.(jpe?g|png)$/i.test(file.name)
-  const esPDF = file && /\.pdf$/i.test(file.name)
-  const preview = file && esImagen ? URL.createObjectURL(file) : null
-
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-gray-700">{label}</p>
-
-      {file ? (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-nc-green-light border border-nc-green">
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt={file.name}
-              className="w-10 h-10 object-cover rounded border border-nc-green/30 flex-shrink-0"
-            />
-          ) : esPDF ? (
-            <div className="w-10 h-10 flex items-center justify-center bg-red-50 rounded border border-red-200 flex-shrink-0">
-              <FileText className="h-5 w-5 text-red-500" />
-            </div>
-          ) : (
-            <div className="w-10 h-10 flex items-center justify-center bg-nc-green-light rounded border border-nc-green/30 flex-shrink-0">
-              <FileCheck className="h-5 w-5 text-nc-green" />
-            </div>
-          )}
-          <span className="flex-1 text-sm text-nc-green-dark truncate">{file.name}</span>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-muted-foreground hover:text-red-500 flex-shrink-0"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      ) : (
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-            isDragActive
-              ? 'border-nc-green bg-nc-green-light'
-              : 'border-gray-200 hover:border-nc-green hover:bg-nc-green-light/40'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <Upload className="h-4 w-4" />
-            <span className="text-sm">
-              {isDragActive ? 'Suelta aquí' : 'Arrastra o haz click'}
-            </span>
-            <ImageIcon className="h-4 w-4" />
-          </div>
-          <p className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, PDF — máx. 10MB</p>
-        </div>
-      )}
-    </div>
-  )
-}
+// ---------------------------------------------------------------------------
+// Componente principal
+// ---------------------------------------------------------------------------
 
 export default function MatriculaForm({ matricula, personas, modo }: MatriculaFormProps) {
   const router = useRouter()
@@ -245,9 +257,9 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
   const [secOpen, setSecOpen] = useState({
     vehiculo: true,
     comprador: true,
-    vendedor: true,
+    vendedor: false,
     docs: true,
-    notas: true,
+    notas: false,
   })
 
   const [archivos, setArchivos] = useState<Record<TipoDocumento, File | null>>({
@@ -288,6 +300,9 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
         cedula: comprador?.cedula ?? '',
         telefono: comprador?.telefono ?? '',
         direccion: comprador?.direccion ?? '',
+        provincia: comprador?.provincia ?? '',
+        municipio: comprador?.municipio ?? '',
+        sector: comprador?.sector ?? '',
       },
       vendedor: {
         nombre: vendedor?.nombre ?? '',
@@ -295,6 +310,9 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
         cedula: vendedor?.cedula ?? '',
         telefono: vendedor?.telefono ?? '',
         direccion: vendedor?.direccion ?? '',
+        provincia: vendedor?.provincia ?? '',
+        municipio: vendedor?.municipio ?? '',
+        sector: vendedor?.sector ?? '',
       },
     },
   })
@@ -309,7 +327,6 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
       if (modo === 'crear') {
         const { id: matriculaId } = await crearMatricula(values)
 
-        // Subir archivos seleccionados
         const supabase = getSupabaseBrowser()
         const docsTipos = DOCS_FORM.map((d) => d.tipo)
 
@@ -356,54 +373,35 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-3xl">
-        {/* Sección 1: Código cliente y vehículo */}
+
+        {/* Sección 1: Vehículo */}
         <Card>
           <CardHeader className="pb-2">
             <SeccionHeader
-              titulo="Código cliente y Vehículo"
+              titulo="Vehículo"
               open={secOpen.vehiculo}
               onToggle={() => toggle('vehiculo')}
             />
           </CardHeader>
           {secOpen.vehiculo && (
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="numero_credito"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Código cliente</FormLabel>
-                      <FormControl>
-                        <Input placeholder="ej: (1234)" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="codigo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Código{' '}
-                        <span className="text-xs text-muted-foreground font-normal">
-                          (auto-generado)
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="NC-2025-001"
-                          {...field}
-                          value={field.value ?? ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Código NC (auto-generado) */}
+              <FormField
+                control={form.control}
+                name="codigo"
+                render={({ field }) => (
+                  <FormItem className="max-w-xs">
+                    <FormLabel>
+                      Código{' '}
+                      <span className="text-xs text-muted-foreground font-normal">(auto-generado)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="NC-2025-001" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -459,9 +457,7 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
                           {...field}
                           value={field.value ?? ''}
                           onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? parseInt(e.target.value) : undefined
-                            )
+                            field.onChange(e.target.value ? parseInt(e.target.value) : undefined)
                           }
                         />
                       </FormControl>
@@ -511,9 +507,7 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
                           className="w-4 h-4 accent-nc-green"
                         />
                       </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">
-                        ¿Lleva traspaso?
-                      </FormLabel>
+                      <FormLabel className="font-normal cursor-pointer">¿Lleva traspaso?</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -530,9 +524,7 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
                           className="w-4 h-4 accent-nc-green"
                         />
                       </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">
-                        ¿Lleva oposición?
-                      </FormLabel>
+                      <FormLabel className="font-normal cursor-pointer">¿Lleva oposición?</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -541,7 +533,7 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
           )}
         </Card>
 
-        {/* Sección 2: Comprador */}
+        {/* Sección 2: Cliente */}
         <Card>
           <CardHeader className="pb-2">
             <SeccionHeader
@@ -551,17 +543,33 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
             />
           </CardHeader>
           {secOpen.comprador && (
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Código cliente aquí */}
+              <FormField
+                control={form.control}
+                name="numero_credito"
+                render={({ field }) => (
+                  <FormItem className="max-w-xs">
+                    <FormLabel>Código cliente</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ej: 1234" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Separator />
               <PersonaFields form={form} prefix="comprador" titulo="Datos del Cliente" />
             </CardContent>
           )}
         </Card>
 
-        {/* Sección 3: Vendedor */}
+        {/* Sección 3: Vendedor (opcional) */}
         <Card>
           <CardHeader className="pb-2">
             <SeccionHeader
               titulo="Vendedor"
+              subtitulo="Opcional"
               open={secOpen.vendedor}
               onToggle={() => toggle('vendedor')}
             />
@@ -573,12 +581,13 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
           )}
         </Card>
 
-        {/* Sección 4: Documentos (solo en modo crear) */}
+        {/* Sección 4: Documentos (solo crear) */}
         {modo === 'crear' && (
           <Card>
             <CardHeader className="pb-2">
               <SeccionHeader
-                titulo="Documentos (opcional)"
+                titulo="Documentos"
+                subtitulo="Opcional"
                 open={secOpen.docs}
                 onToggle={() => toggle('docs')}
               />
@@ -586,10 +595,11 @@ export default function MatriculaForm({ matricula, personas, modo }: MatriculaFo
             {secOpen.docs && (
               <CardContent className="space-y-5">
                 <p className="text-xs text-muted-foreground">
-                  Puedes subir los escaneos ahora (JPG, PNG o PDF) o agregarlos después desde el detalle de la matrícula.
+                  Puedes subir los escaneos ahora o agregarlos después desde el detalle de la matrícula.
+                  Las imágenes se comprimen automáticamente para optimizar el almacenamiento.
                 </p>
                 {DOCS_FORM.map(({ tipo, label }) => (
-                  <DocFileSlot
+                  <DocumentoFilePicker
                     key={tipo}
                     tipo={tipo}
                     label={label}
