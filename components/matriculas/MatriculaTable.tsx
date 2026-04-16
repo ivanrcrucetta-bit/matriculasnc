@@ -39,6 +39,7 @@ const DOC_SHORT: Record<TipoDocumento, string> = {
   poder_notarial: 'Poder Not.',
   carta_no_objecion: 'No Objeción',
   contrato_prenda: 'Prenda',
+  acuse_entrega: 'Acuse',
   otro: 'Otro',
 }
 

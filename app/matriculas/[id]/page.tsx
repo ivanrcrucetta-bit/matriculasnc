@@ -154,8 +154,12 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                       ...(persona.rol === 'comprador' && matricula.numero_credito
                         ? [{ label: 'Código cliente', value: matricula.numero_credito }]
                         : []),
-                      { label: 'Nombre', value: `${persona.nombre} ${persona.apellido}` },
+                      {
+                        label: 'Nombre',
+                        value: `${persona.nombre ?? ''} ${persona.apellido ?? ''}`.trim() || null,
+                      },
                       { label: 'Cédula', value: persona.cedula },
+                      { label: 'Pasaporte', value: persona.pasaporte },
                       { label: 'Teléfono', value: persona.telefono },
                       ...(persona.provincia
                         ? [
@@ -164,15 +168,57 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
                             { label: 'Sector / Calle', value: persona.sector },
                           ]
                         : [{ label: 'Dirección', value: persona.direccion }]),
-                    ].map(({ label, value }) => (
-                      <div key={label}>
-                        <dt className="text-muted-foreground">{label}</dt>
-                        <dd className="font-medium text-gray-900 break-words">{value ?? '—'}</dd>
-                      </div>
-                    ))}
+                    ]
+                      .filter(({ value }) => value) // Oculta filas vacías para no saturar la vista.
+                      .map(({ label, value }) => (
+                        <div key={label}>
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="font-medium text-gray-900 break-words">{value ?? '—'}</dd>
+                        </div>
+                      ))}
                   </dl>
                 </div>
               ) : null
+            )}
+
+            {/* Entrega final (solo cuando ya se entregó) */}
+            {matricula.fecha_entrega && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+                <h2 className="font-semibold text-emerald-900 mb-4">
+                  Entrega al cliente
+                </h2>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  {[
+                    {
+                      label: 'Fecha de entrega',
+                      value: formatFecha(matricula.fecha_entrega),
+                    },
+                    {
+                      label: 'Recibido por',
+                      value: matricula.entregada_a_nombre,
+                    },
+                    { label: 'Cédula', value: matricula.entregada_a_cedula },
+                    {
+                      label: 'Pasaporte',
+                      value: matricula.entregada_a_pasaporte,
+                    },
+                  ]
+                    .filter(({ value }) => value)
+                    .map(({ label, value }) => (
+                      <div key={label}>
+                        <dt className="text-emerald-800/70">{label}</dt>
+                        <dd className="font-medium text-emerald-950 break-words">
+                          {value ?? '—'}
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+                {documentosList.some((d) => d.tipo === 'acuse_entrega') && (
+                  <p className="mt-3 text-xs text-emerald-900/80">
+                    Acuse firmado adjunto en la sección de documentos.
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Notas (campo legacy) */}
@@ -211,7 +257,11 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
 
             {/* Acciones */}
             <div className="bg-white border border-border rounded-lg p-6">
-              <PanelAcciones matricula={matricula} documentos={documentosList} />
+              <PanelAcciones
+                matricula={matricula}
+                documentos={documentosList}
+                comprador={comprador ?? null}
+              />
             </div>
           </div>
         </div>

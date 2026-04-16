@@ -94,6 +94,25 @@ export default function PersonaSection({ form, prefix, titulo }: Props) {
         />
         <FormField
           control={form.control}
+          name={`${prefix}.pasaporte` as `comprador.pasaporte`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Pasaporte</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="AB1234567"
+                  {...field}
+                  value={field.value ?? ''}
+                  maxLength={20}
+                  autoCapitalize="characters"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name={`${prefix}.telefono` as `comprador.telefono`}
           render={({ field }) => (
             <FormItem>

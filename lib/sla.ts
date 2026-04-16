@@ -9,6 +9,7 @@ export const SLA_CONFIG: Record<Etapa, number | null> = {
   traspaso_en_proceso: 45,
   traspaso_completado: 3,
   cerrado: null, // No SLA for closed
+  entregada: null, // Ya entregada, sin SLA
 }
 
 export interface SLAStatus {

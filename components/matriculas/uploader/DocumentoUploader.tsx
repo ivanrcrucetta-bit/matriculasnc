@@ -44,6 +44,7 @@ const TIPOS_DISPONIBLES: TipoDocumento[] = [
   'poder_notarial',
   'carta_no_objecion',
   'contrato_prenda',
+  'acuse_entrega',
   'otro',
 ]
 

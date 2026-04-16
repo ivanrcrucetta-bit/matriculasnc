@@ -7,6 +7,7 @@ export type Etapa =
   | 'traspaso_en_proceso'
   | 'traspaso_completado'
   | 'cerrado'
+  | 'entregada'
 
 export type RolPersona = 'comprador' | 'vendedor'
 
@@ -22,6 +23,7 @@ export type TipoDocumento =
   | 'poder_notarial'
   | 'carta_no_objecion'
   | 'contrato_prenda'
+  | 'acuse_entrega'
   | 'otro'
 
 export type TipoEvento =
@@ -33,6 +35,7 @@ export type TipoEvento =
   | 'oposicion_retirada'
   | 'traspaso_iniciado'
   | 'traspaso_completado'
+  | 'entrega_registrada'
   | 'nota_agregada'
   | 'cierre'
 
@@ -51,6 +54,10 @@ export interface Matricula {
   etapa: Etapa
   fecha_oposicion: string | null
   fecha_traspaso: string | null
+  fecha_entrega: string | null
+  entregada_a_nombre: string | null
+  entregada_a_cedula: string | null
+  entregada_a_pasaporte: string | null
   notas: string | null
   created_at: string
   updated_at: string
@@ -65,6 +72,7 @@ export interface Persona {
   nombre: string
   apellido: string
   cedula: string | null
+  pasaporte: string | null
   telefono: string | null
   direccion: string | null
   provincia: string | null
@@ -167,6 +175,12 @@ export const ETAPA_INFO: Record<Etapa, EtapaInfo> = {
     descripcion: 'Caso cerrado',
     color: 'slate',
   },
+  entregada: {
+    etapa: 'entregada',
+    label: 'Entregada',
+    descripcion: 'Matrícula entregada al cliente tras saldar',
+    color: 'emerald',
+  },
 }
 
 // Composite types for people directory
@@ -221,6 +235,7 @@ export const ETAPAS_ORDEN: Etapa[] = [
   'traspaso_en_proceso',
   'traspaso_completado',
   'cerrado',
+  'entregada',
 ]
 
 export const TIPO_DOC_LABELS: Record<TipoDocumento, string> = {
@@ -235,6 +250,7 @@ export const TIPO_DOC_LABELS: Record<TipoDocumento, string> = {
   poder_notarial: 'Poder Notarial',
   carta_no_objecion: 'Carta de No Objeción',
   contrato_prenda: 'Contrato de Prenda',
+  acuse_entrega: 'Acuse de Entrega',
   otro: 'Otro',
 }
 
@@ -247,6 +263,7 @@ export const TIPO_EVENTO_LABELS: Record<TipoEvento, string> = {
   oposicion_retirada: 'Oposición Retirada',
   traspaso_iniciado: 'Traspaso Iniciado',
   traspaso_completado: 'Traspaso Completado',
+  entrega_registrada: 'Entrega Registrada',
   nota_agregada: 'Nota Agregada',
   cierre: 'Caso Cerrado',
 }

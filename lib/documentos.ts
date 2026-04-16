@@ -110,6 +110,15 @@ export const TIPO_DOCUMENTO_INFO: Record<TipoDocumento, TipoDocumentoInfo> = {
     textColor: 'text-rose-700',
     requerido: false,
   },
+  acuse_entrega: {
+    label: 'Acuse de Entrega',
+    shortLabel: 'Acuse',
+    descripcion: 'Copia firmada por el receptor al entregar la matrícula',
+    color: 'lime',
+    bgColor: 'bg-lime-50',
+    textColor: 'text-lime-700',
+    requerido: false,
+  },
   otro: {
     label: 'Otro',
     shortLabel: 'Otro',

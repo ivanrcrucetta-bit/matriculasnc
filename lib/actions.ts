@@ -146,18 +146,19 @@ export async function crearMatricula(
 
   const { id: matricula_id } = mat
 
-  const compradorRow = {
-    matricula_id,
-    rol: 'comprador' as const,
-    nombre: values.comprador.nombre,
-    apellido: values.comprador.apellido,
-    cedula: values.comprador.cedula || null,
-    telefono: values.comprador.telefono || null,
-    direccion: values.comprador.direccion || null,
-    provincia: values.comprador.provincia || null,
-    municipio: values.comprador.municipio || null,
-    sector: values.comprador.sector || null,
-  }
+  const compradorTieneDatos =
+    values.comprador &&
+    [
+      values.comprador.nombre,
+      values.comprador.apellido,
+      values.comprador.cedula,
+      values.comprador.pasaporte,
+      values.comprador.telefono,
+      values.comprador.direccion,
+      values.comprador.provincia,
+      values.comprador.municipio,
+      values.comprador.sector,
+    ].some((v) => v && v.trim().length > 0)
 
   const vendedorTieneDatos =
     values.vendedor &&
@@ -165,31 +166,54 @@ export async function crearMatricula(
       values.vendedor.nombre,
       values.vendedor.apellido,
       values.vendedor.cedula,
+      values.vendedor.pasaporte,
       values.vendedor.telefono,
+      values.vendedor.direccion,
       values.vendedor.provincia,
       values.vendedor.municipio,
       values.vendedor.sector,
     ].some((v) => v && v.trim().length > 0)
 
-  const filas = vendedorTieneDatos
-    ? [
-        compradorRow,
-        {
-          matricula_id,
-          rol: 'vendedor' as const,
-          nombre: values.vendedor!.nombre || '',
-          apellido: values.vendedor!.apellido || '',
-          cedula: values.vendedor!.cedula || null,
-          telefono: values.vendedor!.telefono || null,
-          direccion: values.vendedor!.direccion || null,
-          provincia: values.vendedor!.provincia || null,
-          municipio: values.vendedor!.municipio || null,
-          sector: values.vendedor!.sector || null,
-        },
-      ]
-    : [compradorRow]
+  const filas: Array<Record<string, unknown>> = []
 
-  await supabase.schema(SCHEMA).from('personas').insert(filas)
+  if (compradorTieneDatos) {
+    filas.push({
+      matricula_id,
+      rol: 'comprador' as const,
+      nombre: values.comprador.nombre || '',
+      apellido: values.comprador.apellido || '',
+      cedula: values.comprador.cedula || null,
+      pasaporte: values.comprador.pasaporte || null,
+      telefono: values.comprador.telefono || null,
+      direccion: values.comprador.direccion || null,
+      provincia: values.comprador.provincia || null,
+      municipio: values.comprador.municipio || null,
+      sector: values.comprador.sector || null,
+    })
+  }
+
+  if (vendedorTieneDatos) {
+    filas.push({
+      matricula_id,
+      rol: 'vendedor' as const,
+      nombre: values.vendedor.nombre || '',
+      apellido: values.vendedor.apellido || '',
+      cedula: values.vendedor.cedula || null,
+      pasaporte: values.vendedor.pasaporte || null,
+      telefono: values.vendedor.telefono || null,
+      direccion: values.vendedor.direccion || null,
+      provincia: values.vendedor.provincia || null,
+      municipio: values.vendedor.municipio || null,
+      sector: values.vendedor.sector || null,
+    })
+  }
+
+  if (filas.length > 0) {
+    await supabase
+      .schema(SCHEMA)
+      .from('personas')
+      .insert(filas as never)
+  }
 
   await registrarHistorial(
     supabase,
@@ -250,68 +274,69 @@ export async function actualizarMatricula(
     .update(update as Record<string, never>)
     .eq('id', id)
 
-  if (values.comprador) {
-    await supabase
+  // Upsert manual por rol: si existe persona la actualizamos (aunque todos los
+  // campos estén vacíos — respetamos la intención del usuario); si no existe y
+  // el formulario trae al menos un dato, la insertamos. Nunca bloqueamos por
+  // ausencia de datos.
+  async function upsertPersona(
+    rol: 'comprador' | 'vendedor',
+    persona: Partial<MatriculaFormValues['comprador']>
+  ) {
+    const tieneDatos = [
+      persona.nombre,
+      persona.apellido,
+      persona.cedula,
+      persona.pasaporte,
+      persona.telefono,
+      persona.direccion,
+      persona.provincia,
+      persona.municipio,
+      persona.sector,
+    ].some((v) => v && v.trim().length > 0)
+
+    const { data: existente } = await supabase
       .schema(SCHEMA)
       .from('personas')
-      .update({
-        nombre: values.comprador.nombre,
-        apellido: values.comprador.apellido,
-        cedula: values.comprador.cedula || null,
-        telefono: values.comprador.telefono || null,
-        direccion: values.comprador.direccion || null,
-        provincia: values.comprador.provincia || null,
-        municipio: values.comprador.municipio || null,
-        sector: values.comprador.sector || null,
-      })
+      .select('id')
       .eq('matricula_id', id)
-      .eq('rol', 'comprador')
+      .eq('rol', rol)
+      .maybeSingle()
+
+    const payload = {
+      matricula_id: id,
+      rol,
+      nombre: persona.nombre || '',
+      apellido: persona.apellido || '',
+      cedula: persona.cedula || null,
+      pasaporte: persona.pasaporte || null,
+      telefono: persona.telefono || null,
+      direccion: persona.direccion || null,
+      provincia: persona.provincia || null,
+      municipio: persona.municipio || null,
+      sector: persona.sector || null,
+    }
+
+    if (existente) {
+      await supabase
+        .schema(SCHEMA)
+        .from('personas')
+        .update(payload as never)
+        .eq('matricula_id', id)
+        .eq('rol', rol)
+    } else if (tieneDatos) {
+      await supabase
+        .schema(SCHEMA)
+        .from('personas')
+        .insert(payload as never)
+    }
+  }
+
+  if (values.comprador) {
+    await upsertPersona('comprador', values.comprador)
   }
 
   if (values.vendedor) {
-    const vendTieneDatos = [
-      values.vendedor.nombre,
-      values.vendedor.apellido,
-      values.vendedor.cedula,
-      values.vendedor.telefono,
-      values.vendedor.provincia,
-      values.vendedor.municipio,
-      values.vendedor.sector,
-    ].some((v) => v && v.trim().length > 0)
-
-    if (vendTieneDatos) {
-      const { data: existente } = await supabase
-        .schema(SCHEMA)
-        .from('personas')
-        .select('id')
-        .eq('matricula_id', id)
-        .eq('rol', 'vendedor')
-        .maybeSingle()
-
-      const vendedorPayload = {
-        matricula_id: id,
-        rol: 'vendedor' as const,
-        nombre: values.vendedor.nombre || '',
-        apellido: values.vendedor.apellido || '',
-        cedula: values.vendedor.cedula || null,
-        telefono: values.vendedor.telefono || null,
-        direccion: values.vendedor.direccion || null,
-        provincia: values.vendedor.provincia || null,
-        municipio: values.vendedor.municipio || null,
-        sector: values.vendedor.sector || null,
-      }
-
-      if (existente) {
-        await supabase
-          .schema(SCHEMA)
-          .from('personas')
-          .update(vendedorPayload)
-          .eq('matricula_id', id)
-          .eq('rol', 'vendedor')
-      } else {
-        await supabase.schema(SCHEMA).from('personas').insert(vendedorPayload)
-      }
-    }
+    await upsertPersona('vendedor', values.vendedor)
   }
 
   await registrarHistorial(
@@ -494,6 +519,130 @@ export async function completarTraspaso(matriculaId: string) {
 
   revalidatePath(`/matriculas/${matriculaId}`)
   revalidatePath('/')
+}
+
+export interface RegistrarEntregaInput {
+  fecha: Date
+  receptor_nombre: string
+  receptor_cedula?: string | null
+  receptor_pasaporte?: string | null
+  /**
+   * Documento de acuse opcional. Si se provee, ya debe haber sido subido al
+   * storage (mediante el flujo normal de `crearSignedUploadUrl`). Aquí solo
+   * registramos la fila en `matriculas.documentos`.
+   */
+  acuse?: {
+    storage_path: string
+    nombre_archivo: string
+  }
+}
+
+/**
+ * Registra la entrega final de la matrícula al cliente que ya saldó.
+ *
+ * - Escribe `fecha_entrega` y los campos `entregada_a_*` en la matrícula.
+ * - Si viene un acuse, lo inserta como documento del expediente.
+ * - Crea evento `entrega_registrada` en el historial.
+ * - Sincroniza etapa → termina en `entregada`.
+ *
+ * Decisión de diseño: guardamos la entrega como metadato en la propia fila de
+ * la matrícula (no en tabla aparte) porque se entrega una sola vez por ciclo
+ * y simplifica los listados.
+ */
+export async function registrarEntrega(
+  matriculaId: string,
+  input: RegistrarEntregaInput
+) {
+  const supabase = await createSupabaseServer()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const update: Record<string, unknown> = {
+    fecha_entrega: formatISO(input.fecha),
+    entregada_a_nombre: input.receptor_nombre.trim(),
+    entregada_a_cedula: input.receptor_cedula?.trim() || null,
+    entregada_a_pasaporte: input.receptor_pasaporte?.trim() || null,
+    updated_by: user?.id ?? null,
+  }
+
+  const { error } = await supabase
+    .schema(SCHEMA)
+    .from('matriculas')
+    .update(update as Record<string, never>)
+    .eq('id', matriculaId)
+
+  if (error) throw new Error(error.message)
+
+  if (input.acuse) {
+    await supabase.schema(SCHEMA).from('documentos').insert({
+      matricula_id: matriculaId,
+      tipo: 'acuse_entrega',
+      nombre_archivo: input.acuse.nombre_archivo,
+      storage_path: input.acuse.storage_path,
+      subido_por: user?.id ?? null,
+    })
+  }
+
+  const descripcion = `Matrícula entregada a ${input.receptor_nombre.trim()} el ${formatISO(
+    input.fecha
+  )}`
+
+  await registrarHistorial(
+    supabase,
+    matriculaId,
+    'entrega_registrada',
+    descripcion,
+    user?.email
+  )
+
+  await sincronizarEtapa(supabase, matriculaId)
+
+  revalidatePath(`/matriculas/${matriculaId}`)
+  revalidatePath('/')
+  revalidatePath('/matriculas')
+}
+
+/**
+ * Revierte una entrega por error: limpia los 4 campos y anota en historial.
+ * El documento `acuse_entrega` (si se subió) permanece en el expediente por
+ * diseño — si se quiere eliminar, debe hacerse manualmente desde DocGrid.
+ */
+export async function revertirEntrega(matriculaId: string) {
+  const supabase = await createSupabaseServer()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const payload: Record<string, unknown> = {
+    fecha_entrega: null,
+    entregada_a_nombre: null,
+    entregada_a_cedula: null,
+    entregada_a_pasaporte: null,
+    updated_by: user?.id ?? null,
+  }
+
+  const { error } = await supabase
+    .schema(SCHEMA)
+    .from('matriculas')
+    .update(payload as Record<string, never>)
+    .eq('id', matriculaId)
+
+  if (error) throw new Error(error.message)
+
+  await registrarHistorial(
+    supabase,
+    matriculaId,
+    'nota_agregada',
+    'Entrega revertida',
+    user?.email
+  )
+
+  await sincronizarEtapa(supabase, matriculaId)
+
+  revalidatePath(`/matriculas/${matriculaId}`)
+  revalidatePath('/')
+  revalidatePath('/matriculas')
 }
 
 export async function cerrarCaso(matriculaId: string) {

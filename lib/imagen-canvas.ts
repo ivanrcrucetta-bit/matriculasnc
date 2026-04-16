@@ -31,6 +31,7 @@ export const PRESETS_POR_TIPO: Record<TipoDocumento, PresetDoc> = {
   poder_notarial: { maxPx: 2400, calidad: 0.8 },
   carta_no_objecion: { maxPx: 2000, calidad: 0.82 },
   contrato_prenda: { maxPx: 2400, calidad: 0.8 },
+  acuse_entrega: { maxPx: 2000, calidad: 0.82 },
   otro: { maxPx: MAX_PX_DOC, calidad: CALIDAD_DOC },
 }
 

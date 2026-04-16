@@ -25,6 +25,7 @@ export const EMPTY_DRAFT: MatriculaFormValues = {
     nombre: '',
     apellido: '',
     cedula: '',
+    pasaporte: '',
     telefono: '',
     direccion: '',
     provincia: '',
@@ -35,6 +36,7 @@ export const EMPTY_DRAFT: MatriculaFormValues = {
     nombre: '',
     apellido: '',
     cedula: '',
+    pasaporte: '',
     telefono: '',
     direccion: '',
     provincia: '',
@@ -79,7 +81,7 @@ export const useMatriculaDraft = create<DraftState>()(
         }),
     }),
     {
-      name: 'matricula-draft-v1',
+      name: 'matricula-draft-v2',
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
           return {

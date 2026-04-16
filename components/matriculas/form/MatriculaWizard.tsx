@@ -35,21 +35,14 @@ const STEPS = [
 ] as const
 
 const FIELDS_POR_PASO: Record<number, Array<keyof MatriculaFormValues | string>> = {
+  // Paso 0: la placa es lo único requerido. Validamos también los formatos de
+  // los demás campos de vehículo por si el usuario pegó un año fuera de rango,
+  // pero ninguno corta el avance salvo la placa.
   0: ['placa', 'marca', 'modelo', 'año', 'chasis', 'color', 'lleva_traspaso', 'lleva_oposicion'],
-  1: [
-    'numero_credito',
-    'comprador.nombre',
-    'comprador.apellido',
-    'comprador.cedula',
-    'comprador.telefono',
-    'comprador.provincia',
-    'comprador.municipio',
-    'comprador.sector',
-    'vendedor.nombre',
-    'vendedor.apellido',
-    'vendedor.cedula',
-    'vendedor.telefono',
-  ],
+  // Paso 1 (Cliente) sin validación bloqueante: toda persona es opcional y los
+  // formatos RD de cédula/teléfono se chequean solo si el usuario escribió algo.
+  // No queremos que la ausencia de datos del comprador corte la creación.
+  1: [],
   2: [],
 }
 
@@ -117,7 +110,20 @@ export default function MatriculaWizard() {
   }
 
   async function onCrear() {
-    const valido = await form.trigger()
+    // Filosofía "control, no bloqueo": solo validamos los campos que pueden
+    // tener formato inválido si el usuario escribió algo (cédula/teléfono RD)
+    // y la placa como único campo realmente requerido. Todo lo demás queda
+    // a discreción del operador.
+    const valido = await form.trigger([
+      'placa',
+      'año',
+      'comprador.cedula',
+      'comprador.pasaporte',
+      'comprador.telefono',
+      'vendedor.cedula',
+      'vendedor.pasaporte',
+      'vendedor.telefono',
+    ])
     if (!valido) {
       toast.error('Revisa los campos marcados en rojo')
       return

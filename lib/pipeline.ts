@@ -55,6 +55,10 @@ export function calcularEtapa(
 
   const docsCompletos = DOCS_OBLIGATORIOS.every((tipo) => tipos.includes(tipo))
 
+  // Entrega es terminal y gana sobre todo: si el caso quedó registrado como
+  // entregado, se mantiene ahí mientras exista fecha_entrega.
+  if (matricula.fecha_entrega) return 'entregada'
+
   // El estado cerrado es definitivo; no se recalcula automáticamente.
   if (etapaActual === 'cerrado') return 'cerrado'
 
@@ -110,7 +114,7 @@ export function etapasVisibles(matricula: Matricula): Etapa[] {
     todas.push('traspaso_en_proceso', 'traspaso_completado')
   }
 
-  todas.push('cerrado')
+  todas.push('cerrado', 'entregada')
   return todas
 }
 

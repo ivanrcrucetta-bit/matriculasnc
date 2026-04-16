@@ -8,6 +8,7 @@ import {
   MessageSquare,
   XCircle,
   Plus,
+  PackageCheck,
 } from 'lucide-react'
 import { formatFechaHora } from '@/lib/fecha'
 import type { EventoHistorial, TipoEvento } from '@/types'
@@ -21,6 +22,7 @@ const icono: Record<TipoEvento, React.ComponentType<{ className?: string }>> = {
   oposicion_retirada: ShieldOff,
   traspaso_iniciado: ArrowLeftRight,
   traspaso_completado: CheckCircle,
+  entrega_registrada: PackageCheck,
   nota_agregada: MessageSquare,
   cierre: XCircle,
 }
@@ -34,6 +36,7 @@ const colorIcono: Record<TipoEvento, string> = {
   oposicion_retirada: 'bg-gray-100 text-gray-500',
   traspaso_iniciado: 'bg-teal-50 text-teal-600',
   traspaso_completado: 'bg-emerald-50 text-emerald-600',
+  entrega_registrada: 'bg-emerald-100 text-emerald-700',
   nota_agregada: 'bg-purple-50 text-purple-600',
   cierre: 'bg-slate-100 text-slate-600',
 }

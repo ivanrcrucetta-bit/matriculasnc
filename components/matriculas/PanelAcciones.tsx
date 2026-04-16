@@ -16,13 +16,17 @@ import {
   iniciarTraspaso,
   completarTraspaso,
   cerrarCaso,
+  revertirEntrega,
 } from '@/lib/actions'
 import { calcularBloqueos } from '@/lib/pipeline'
-import type { Matricula, Documento } from '@/types'
+import { formatFecha } from '@/lib/fecha'
+import type { Matricula, Documento, Persona } from '@/types'
+import RegistrarEntregaDialog from './RegistrarEntregaDialog'
 
 interface PanelAccionesProps {
   matricula: Matricula
   documentos: Documento[]
+  comprador?: Persona | null
 }
 
 function DatePickerAction({
@@ -80,8 +84,13 @@ function DatePickerAction({
   )
 }
 
-export default function PanelAcciones({ matricula, documentos }: PanelAccionesProps) {
+export default function PanelAcciones({
+  matricula,
+  documentos,
+  comprador,
+}: PanelAccionesProps) {
   const [loading, setLoading] = useState<string | null>(null)
+  const [entregaOpen, setEntregaOpen] = useState(false)
 
   const bloqueos = calcularBloqueos(matricula, documentos)
   const sinBloqueos = bloqueos.length === 0
@@ -126,9 +135,17 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
   const puedeCerrar =
     sinBloqueos &&
     matricula.etapa !== 'cerrado' &&
+    matricula.etapa !== 'entregada' &&
     (matricula.etapa === 'traspaso_completado' ||
       matricula.etapa === 'docs_completos' ||
       matricula.etapa === 'oposicion_puesta')
+
+  const yaEntregada = !!matricula.fecha_entrega
+  const puedeEntregar = !yaEntregada && matricula.etapa !== 'cerrado'
+
+  const nombreSugerido = comprador
+    ? `${comprador.nombre ?? ''} ${comprador.apellido ?? ''}`.trim()
+    : ''
 
   return (
     <div className="space-y-3">
@@ -237,17 +254,93 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
         </>
       )}
 
+      {/* Entrega al cliente que salda */}
+      <Separator />
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Entrega
+        </p>
+        {yaEntregada ? (
+          <div className="space-y-2">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Entregada el {formatFecha(matricula.fecha_entrega)}
+              </div>
+              {matricula.entregada_a_nombre && (
+                <div className="mt-1">
+                  Receptor:{' '}
+                  <span className="font-medium">
+                    {matricula.entregada_a_nombre}
+                  </span>
+                </div>
+              )}
+              {(matricula.entregada_a_cedula ||
+                matricula.entregada_a_pasaporte) && (
+                <div className="text-emerald-800/80">
+                  {matricula.entregada_a_cedula &&
+                    `Cédula: ${matricula.entregada_a_cedula}`}
+                  {matricula.entregada_a_cedula &&
+                    matricula.entregada_a_pasaporte &&
+                    ' · '}
+                  {matricula.entregada_a_pasaporte &&
+                    `Pasaporte: ${matricula.entregada_a_pasaporte}`}
+                </div>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+              disabled={loading === 'revertir-entrega'}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    '¿Revertir la entrega? Los datos del receptor se borrarán. El acuse, si existe, queda en el expediente.'
+                  )
+                )
+                  return
+                run('revertir-entrega', async () => {
+                  await revertirEntrega(matricula.id)
+                  toast.success('Entrega revertida')
+                })
+              }}
+            >
+              {loading === 'revertir-entrega' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <X className="h-4 w-4" />
+              )}
+              Revertir entrega
+            </Button>
+          </div>
+        ) : (
+          <Button
+            className={cn(
+              'w-full gap-2',
+              puedeEntregar
+                ? 'bg-nc-green hover:bg-nc-green-dark'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+            disabled={!puedeEntregar}
+            onClick={() => setEntregaOpen(true)}
+          >
+            <CheckCircle className="h-4 w-4" />
+            Entregar matrícula
+          </Button>
+        )}
+      </div>
+
       {/* Cerrar caso */}
-      {matricula.etapa !== 'cerrado' && (
+      {matricula.etapa !== 'cerrado' && matricula.etapa !== 'entregada' && (
         <>
           <Separator />
           <div className="space-y-2">
             <Button
+              variant="outline"
               className={cn(
                 'w-full gap-2',
-                puedeCerrar
-                  ? 'bg-nc-green hover:bg-nc-green-dark'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                !puedeCerrar && 'text-gray-400 cursor-not-allowed'
               )}
               disabled={!puedeCerrar || loading === 'cerrar'}
               onClick={() =>
@@ -262,7 +355,7 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
               ) : (
                 <CheckCircle className="h-4 w-4" />
               )}
-              Cerrar caso
+              Cerrar caso (sin entrega)
             </Button>
             {!puedeCerrar && (
               <p className="text-xs text-muted-foreground text-center">
@@ -302,6 +395,14 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
           Descargar expediente PDF
         </Button>
       </div>
+
+      <RegistrarEntregaDialog
+        matriculaId={matricula.id}
+        open={entregaOpen}
+        onOpenChange={setEntregaOpen}
+        nombreSugerido={nombreSugerido}
+        cedulaSugerida={comprador?.cedula ?? null}
+      />
     </div>
   )
 }

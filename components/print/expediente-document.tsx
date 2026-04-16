@@ -196,6 +196,7 @@ export function ExpedienteDocument({
                   value: `${comprador.nombre} ${comprador.apellido}`,
                 },
                 { label: 'Cédula', value: comprador.cedula ?? '—' },
+                { label: 'Pasaporte', value: comprador.pasaporte ?? '—' },
                 { label: 'Teléfono', value: comprador.telefono ?? '—' },
                 {
                   label: 'Dirección',
@@ -230,6 +231,7 @@ export function ExpedienteDocument({
                   value: `${vendedor.nombre} ${vendedor.apellido}`,
                 },
                 { label: 'Cédula', value: vendedor.cedula ?? '—' },
+                { label: 'Pasaporte', value: vendedor.pasaporte ?? '—' },
                 { label: 'Teléfono', value: vendedor.telefono ?? '—' },
                 {
                   label: 'Dirección',
@@ -283,6 +285,39 @@ export function ExpedienteDocument({
             </Text>
           )}
         </View>
+
+        {matricula.fecha_entrega && (
+          <View style={styles.seccion}>
+            <Text style={styles.seccionTitulo}>Entrega al Cliente</Text>
+            <View style={styles.grid2}>
+              {[
+                { label: 'Fecha', value: matricula.fecha_entrega },
+                {
+                  label: 'Recibido por',
+                  value: matricula.entregada_a_nombre ?? '—',
+                },
+                {
+                  label: 'Cédula receptor',
+                  value: matricula.entregada_a_cedula ?? '—',
+                },
+                {
+                  label: 'Pasaporte receptor',
+                  value: matricula.entregada_a_pasaporte ?? '—',
+                },
+              ].map(({ label, value }) => (
+                <View key={label} style={styles.campo}>
+                  <Text style={styles.campoLabel}>{label}</Text>
+                  <Text style={styles.campoValor}>{value}</Text>
+                </View>
+              ))}
+            </View>
+            {tiposDoc.includes('acuse_entrega') && (
+              <Text style={{ fontSize: 9, color: '#1D9E75', marginTop: 4 }}>
+                ✓ Acuse de entrega firmado adjunto al expediente.
+              </Text>
+            )}
+          </View>
+        )}
 
         {matricula.notas && (
           <View style={styles.seccion}>
