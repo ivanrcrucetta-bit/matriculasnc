@@ -70,7 +70,19 @@
   }
 }
 
+@page {
+  size: 9.4in 4.4in;
+  margin: 0;
+}
+
 @media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    width: 9.4in;
+    height: 4.4in;
+  }
   .print\:hidden {
     display: none !important;
   }

@@ -222,12 +222,12 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
         <div
           style={{
             width: '9.4in',
-            height: '4.3in',
-            border: '1px solid #ccc',
+            height: '4.4in',
             position: 'relative',
             padding: '0.5in',
             fontFamily: 'serif',
             fontSize: '12pt',
+            boxSizing: 'border-box',
           }}
         >
           {/* Destinatario */}

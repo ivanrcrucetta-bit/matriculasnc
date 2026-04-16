@@ -35,16 +35,18 @@ export default function DashboardLayout({ children, alertasCount }: DashboardLay
         />
       )}
 
-      <Sidebar
-        alertasCount={alertasCount}
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onSearchOpen={() => setSearchOpen(true)}
-      />
+      <div className="print:hidden">
+        <Sidebar
+          alertasCount={alertasCount}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onSearchOpen={() => setSearchOpen(true)}
+        />
+      </div>
 
-      <main className="flex-1 md:ml-[220px] min-w-0 min-h-screen">
+      <main className="flex-1 md:ml-[220px] print:ml-0 min-w-0 min-h-screen">
         {/* Top bar solo en móvil */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-border sticky top-0 z-10">
+        <div className="md:hidden print:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-border sticky top-0 z-10">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -88,7 +90,7 @@ function BottomNav({
   onSearchOpen: () => void
 }) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-30 safe-area-bottom">
+    <nav className="md:hidden print:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-30 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         <BottomNavItem href="/" icon="dashboard" label="Inicio" />
         <BottomNavItem href="/matriculas" icon="matriculas" label="Matrículas" />
