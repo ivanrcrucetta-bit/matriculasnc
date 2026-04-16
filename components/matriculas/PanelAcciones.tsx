@@ -282,7 +282,7 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
         <Button
           variant="outline"
           className="w-full gap-2"
-          onClick={() => window.print()}
+          onClick={() => window.open(`/matriculas/${matricula.id}/sobre`, '_blank')}
         >
           <Printer className="h-4 w-4" />
           Imprimir sobre
@@ -296,7 +296,7 @@ export default function PanelAcciones({ matricula, documentos }: PanelAccionesPr
         <Button
           variant="outline"
           className="w-full gap-2"
-          onClick={() => window.open(`/matriculas/${matricula.id}/pdf`, '_blank')}
+          onClick={() => window.open(`/api/matriculas/${matricula.id}/expediente`, '_blank')}
         >
           <FileDown className="h-4 w-4" />
           Descargar expediente PDF

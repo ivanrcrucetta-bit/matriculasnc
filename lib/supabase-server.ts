@@ -6,6 +6,7 @@ import {
   getSupabaseServiceRoleKey,
   SUPABASE_ENV_HELP,
 } from '@/lib/supabase-env'
+import type { Database } from '@/types/database'
 
 export async function createSupabaseServer() {
   const env = getSupabasePublicEnv()
@@ -15,7 +16,7 @@ export async function createSupabaseServer() {
 
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     env.url,
     env.publicKey,
     {
@@ -46,7 +47,7 @@ export async function createSupabaseServerAdmin() {
 
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     env.url,
     serviceKey,
     {

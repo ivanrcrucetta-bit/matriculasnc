@@ -13,19 +13,19 @@ export default async function EditarMatriculaPage(props: EditarPageProps) {
   const supabase = await createSupabaseServer()
 
   const { data: mat } = await supabase
-    .schema('matriculas' as 'public')
-    .from('matriculas' as never)
+    .schema('matriculas')
+    .from('matriculas')
     .select('*')
-    .eq('id' as never, params.id)
+    .eq('id', params.id)
     .single()
 
   if (!mat) notFound()
 
   const { data: personas } = await supabase
-    .schema('matriculas' as 'public')
-    .from('personas' as never)
+    .schema('matriculas')
+    .from('personas')
     .select('*')
-    .eq('matricula_id' as never, params.id)
+    .eq('matricula_id', params.id)
 
   const matricula = mat as Matricula
   const personasList = (personas ?? []) as Persona[]

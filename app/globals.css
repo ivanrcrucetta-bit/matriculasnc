@@ -70,23 +70,29 @@
   }
 }
 
+/*
+ * Estilos de impresión base. Cada ruta de impresión (imprimir, sobre) puede
+ * sobrescribir @page y layout según su caso. El default global usa Letter
+ * con márgenes mínimos, apto para imprimir expedientes y documentos.
+ */
 @page {
-  size: 9.4in 4.4in;
-  margin: 0;
+  size: letter;
+  margin: 0.4in;
 }
 
 @media print {
   html, body {
-    margin: 0 !important;
-    padding: 0 !important;
     background: #fff !important;
-    width: 9.4in;
-    height: 4.4in;
   }
   .print\:hidden {
     display: none !important;
   }
   .print\:block {
     display: block !important;
+  }
+  /* Evitar que navegadores corten elementos media en 2 páginas */
+  img, .page-break-inside-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }

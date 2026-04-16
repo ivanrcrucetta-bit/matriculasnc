@@ -1,73 +1,174 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { FileText, Eye, Trash2, Upload, Loader2, ExternalLink } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileText, Eye, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { getSupabaseBrowser } from '@/lib/supabase'
 import { eliminarDocumento } from '@/lib/actions'
+import { firmarUrlsLote } from '@/lib/actions-docs'
 import { formatFecha } from '@/lib/fecha'
-import DocUploader from './DocUploader'
+import DocumentoUploader from './uploader/DocumentoUploader'
+import DocViewer, { type DocViewerItem } from './viewer/DocViewer'
 import { TIPO_DOC_LABELS } from '@/types'
 import type { Documento, TipoDocumento } from '@/types'
-import { TIPOS_REQUERIDOS, TIPOS_ADICIONALES, TIPO_DOCUMENTO_INFO } from '@/lib/documentos'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { TIPOS_REQUERIDOS } from '@/lib/documentos'
 
 const DOCS_PRINCIPALES: TipoDocumento[] = TIPOS_REQUERIDOS
 
-function esImagen(nombre: string) {
+function esImagenNombre(nombre: string) {
   return /\.(jpe?g|png|webp)$/i.test(nombre)
 }
 
-function esPDF(nombre: string) {
-  return /\.pdf$/i.test(nombre)
+/**
+ * Grilla de documentos. Cambios clave respecto a la versión anterior:
+ *  - Firma TODAS las URLs en un solo Server Action (batch).
+ *  - Usa transformaciones de Supabase Storage para thumbnails (240x240, q70).
+ *  - Abre un DocViewer global (lightbox) con navegación, zoom, rotación.
+ *  - Integra el DocumentoUploader unificado en lugar de DocUploader por slot.
+ */
+export default function DocGrid({
+  matriculaId,
+  documentos,
+}: {
+  matriculaId: string
+  documentos: Documento[]
+}) {
+  const docsMap = new Map(documentos.map((d) => [d.tipo, d]))
+  const otrosDocs = documentos.filter((d) => !DOCS_PRINCIPALES.includes(d.tipo))
+
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({})
+  const [fullUrls, setFullUrls] = useState<Record<string, string>>({})
+  const [loadingUrls, setLoadingUrls] = useState(true)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState(0)
+
+  const paths = useMemo(() => documentos.map((d) => d.storage_path), [documentos])
+  const pathsKey = paths.join('|')
+
+  useEffect(() => {
+    if (!paths.length) {
+      setLoadingUrls(false)
+      return
+    }
+    let cancelled = false
+    setLoadingUrls(true)
+
+    async function cargar() {
+      // Thumbnails (solo imágenes) + URLs completas en paralelo
+      const imgPaths = documentos
+        .filter((d) => esImagenNombre(d.nombre_archivo))
+        .map((d) => d.storage_path)
+
+      const [full, thumbs] = await Promise.all([
+        firmarUrlsLote(paths, { expiresIn: 3600 }),
+        imgPaths.length
+          ? firmarUrlsLote(imgPaths, {
+              expiresIn: 3600,
+              transform: {
+                width: 240,
+                height: 240,
+                resize: 'cover',
+                quality: 70,
+              },
+            })
+          : Promise.resolve({ urls: {}, errores: [] }),
+      ])
+
+      if (cancelled) return
+      setFullUrls(full.urls)
+      setThumbUrls(thumbs.urls)
+      setLoadingUrls(false)
+    }
+
+    cargar()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathsKey])
+
+  const viewerItems: DocViewerItem[] = documentos.map((d) => ({
+    id: d.id,
+    nombre_archivo: d.nombre_archivo,
+    tipo: d.tipo,
+    signedUrl: fullUrls[d.storage_path] ?? null,
+  }))
+
+  function abrirVisor(docId: string) {
+    const idx = documentos.findIndex((d) => d.id === docId)
+    if (idx < 0) return
+    setViewerIndex(idx)
+    setViewerOpen(true)
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-semibold text-gray-800 text-sm">Documentos</h3>
+
+      <div className="grid grid-cols-1 gap-3">
+        {DOCS_PRINCIPALES.map((tipo) => {
+          const doc = docsMap.get(tipo)
+          return doc ? (
+            <DocCard
+              key={tipo}
+              doc={doc}
+              matriculaId={matriculaId}
+              thumb={thumbUrls[doc.storage_path] ?? fullUrls[doc.storage_path] ?? null}
+              loading={loadingUrls}
+              onVer={() => abrirVisor(doc.id)}
+            />
+          ) : (
+            <DocSlotVacio key={tipo} tipo={tipo} />
+          )
+        })}
+
+        {otrosDocs.map((doc) => (
+          <DocCard
+            key={doc.id}
+            doc={doc}
+            matriculaId={matriculaId}
+            thumb={thumbUrls[doc.storage_path] ?? fullUrls[doc.storage_path] ?? null}
+            loading={loadingUrls}
+            onVer={() => abrirVisor(doc.id)}
+          />
+        ))}
+      </div>
+
+      <div className="pt-2 space-y-2">
+        <p className="text-xs text-muted-foreground">
+          Agregar documentos — arrastra varios archivos; el tipo se detecta por
+          el nombre y puedes corregirlo por cada archivo.
+        </p>
+        <DocumentoUploader matriculaId={matriculaId} dense />
+      </div>
+
+      <DocViewer
+        items={viewerItems}
+        initialIndex={viewerIndex}
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+      />
+    </div>
+  )
 }
+
+// ---------------------------------------------------------------------------
 
 function DocCard({
   doc,
   matriculaId,
+  thumb,
+  loading,
+  onVer,
 }: {
   doc: Documento
   matriculaId: string
+  thumb: string | null
+  loading: boolean
+  onVer: () => void
 }) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
-  const [loadingUrl, setLoadingUrl] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-
-  const esImg = esImagen(doc.nombre_archivo)
-  const esPdf = esPDF(doc.nombre_archivo)
-
-  // Load signed URL lazily on mount for thumbnail preview
-  useEffect(() => {
-    let cancelled = false
-    async function loadUrl() {
-      setLoadingUrl(true)
-      try {
-        const supabase = getSupabaseBrowser()
-        const { data } = await supabase.storage
-          .from('matriculas-docs')
-          .createSignedUrl(doc.storage_path, 3600)
-        if (!cancelled && data?.signedUrl) setSignedUrl(data.signedUrl)
-      } finally {
-        if (!cancelled) setLoadingUrl(false)
-      }
-    }
-    loadUrl()
-    return () => { cancelled = true }
-  }, [doc.storage_path])
+  const esImg = esImagenNombre(doc.nombre_archivo)
 
   async function handleEliminar() {
     if (!confirm('¿Eliminar este documento?')) return
@@ -83,262 +184,95 @@ function DocCard({
   }
 
   return (
-    <>
-      <div className="border border-border rounded-lg p-4 bg-white space-y-3">
-        <div className="flex items-start gap-3">
-          {/* Thumbnail para imágenes */}
-          {esImg && signedUrl ? (
-            <button
-              type="button"
-              onClick={() => setDialogOpen(true)}
-              className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={signedUrl}
-                alt={doc.nombre_archivo}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ) : (
-            <div className="p-2 bg-nc-green-light rounded-lg flex-shrink-0 w-9 h-9 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-nc-green" />
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900">
-              {TIPO_DOC_LABELS[doc.tipo]}
-            </p>
-            <p className="text-xs text-muted-foreground truncate" title={doc.nombre_archivo}>
-              {doc.nombre_archivo}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {formatFecha(doc.created_at)}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDialogOpen(true)}
-            disabled={loadingUrl || !signedUrl}
-            className="flex-1 gap-1"
+    <div className="border border-border rounded-lg p-4 bg-white space-y-3">
+      <div className="flex items-start gap-3">
+        {esImg && thumb ? (
+          <button
+            type="button"
+            onClick={onVer}
+            className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity"
           >
-            {loadingUrl ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Eye className="h-3 w-3" />
-            )}
-            Ver
-          </Button>
-          {signedUrl && (
-            <Button
-              size="sm"
-              variant="outline"
-              asChild
-              className="gap-1"
-            >
-              <a href={signedUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleEliminar}
-            disabled={deleting}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt={doc.nombre_archivo}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onVer}
+            className="p-2 bg-nc-green-light rounded-lg flex-shrink-0 w-9 h-9 flex items-center justify-center hover:bg-nc-green-light/70 transition-colors"
           >
-            {deleting ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Trash2 className="h-3 w-3" />
-            )}
-          </Button>
+            <FileText className="h-5 w-5 text-nc-green" />
+          </button>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900">
+            {TIPO_DOC_LABELS[doc.tipo]}
+          </p>
+          <p
+            className="text-xs text-muted-foreground truncate"
+            title={doc.nombre_archivo}
+          >
+            {doc.nombre_archivo}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {formatFecha(doc.created_at)}
+          </p>
         </div>
       </div>
 
-      {/* Dialog de vista previa */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl w-full p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b">
-            <DialogTitle className="text-sm font-medium">
-              {TIPO_DOC_LABELS[doc.tipo]} · {doc.nombre_archivo}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="overflow-auto max-h-[75vh]">
-            {signedUrl ? (
-              esImg ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={signedUrl}
-                  alt={doc.nombre_archivo}
-                  className="w-full object-contain"
-                />
-              ) : esPdf ? (
-                <iframe
-                  src={signedUrl}
-                  title={doc.nombre_archivo}
-                  className="w-full"
-                  style={{ height: '70vh', border: 'none' }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-40 text-muted-foreground">
-                  <a
-                    href={signedUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline text-sm"
-                  >
-                    Abrir archivo
-                  </a>
-                </div>
-              )
-            ) : (
-              <div className="flex items-center justify-center h-40">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onVer}
+          disabled={loading}
+          className="flex-1 gap-1"
+        >
+          {loading ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Eye className="h-3 w-3" />
+          )}
+          Ver
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleEliminar}
+          disabled={deleting}
+          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+        >
+          {deleting ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Trash2 className="h-3 w-3" />
+          )}
+        </Button>
+      </div>
+    </div>
   )
 }
 
-function DocSlotVacio({
-  tipo,
-  matriculaId,
-}: {
-  tipo: TipoDocumento
-  matriculaId: string
-}) {
-  const [showUpload, setShowUpload] = useState(false)
-
+function DocSlotVacio({ tipo }: { tipo: TipoDocumento }) {
   return (
-    <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
+    <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 bg-gray-50/50">
       <div className="flex items-center gap-3">
         <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
           <FileText className="h-5 w-5 text-gray-400" />
         </div>
         <div>
-          <p className="text-sm font-medium text-gray-500">{TIPO_DOC_LABELS[tipo]}</p>
+          <p className="text-sm font-medium text-gray-500">
+            {TIPO_DOC_LABELS[tipo]}
+          </p>
           <p className="text-xs text-muted-foreground">No subido</p>
         </div>
       </div>
-      {showUpload ? (
-        <DocUploader
-          matriculaId={matriculaId}
-          tipo={tipo}
-          onSuccess={() => setShowUpload(false)}
-        />
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setShowUpload(true)}
-          className="w-full gap-1 text-nc-green border-nc-green/30 hover:bg-nc-green-light"
-        >
-          <Upload className="h-3 w-3" />
-          Subir
-        </Button>
-      )}
-    </div>
-  )
-}
-
-export default function DocGrid({ matriculaId, documentos }: { matriculaId: string; documentos: Documento[] }) {
-  const docsMap = new Map(documentos.map((d) => [d.tipo, d]))
-
-  const otrosDocs = documentos.filter(
-    (d) => !DOCS_PRINCIPALES.includes(d.tipo)
-  )
-
-  return (
-    <div className="space-y-4">
-      <h3 className="font-semibold text-gray-800 text-sm">Documentos</h3>
-
-      <div className="grid grid-cols-1 gap-3">
-        {DOCS_PRINCIPALES.map((tipo) => {
-          const doc = docsMap.get(tipo)
-          return doc ? (
-            <DocCard key={tipo} doc={doc} matriculaId={matriculaId} />
-          ) : (
-            <DocSlotVacio key={tipo} tipo={tipo} matriculaId={matriculaId} />
-          )
-        })}
-
-        {/* Documentos adicionales */}
-        {otrosDocs.map((doc) => (
-          <DocCard key={doc.id} doc={doc} matriculaId={matriculaId} />
-        ))}
-      </div>
-
-      {/* Upload de documentos adicionales */}
-      <AgregarDocumentoAdicional matriculaId={matriculaId} tiposExistentes={documentos.map(d => d.tipo)} />
-    </div>
-  )
-}
-
-function AgregarDocumentoAdicional({
-  matriculaId,
-  tiposExistentes,
-}: {
-  matriculaId: string
-  tiposExistentes: TipoDocumento[]
-}) {
-  const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoDocumento>('otro')
-  const [mostrarUploader, setMostrarUploader] = useState(false)
-
-  const tiposDisponibles = TIPOS_ADICIONALES.filter(
-    (t) => !tiposExistentes.includes(t) || t === 'otro'
-  )
-
-  return (
-    <div className="pt-2 space-y-2">
-      <p className="text-xs text-muted-foreground">Agregar documento adicional</p>
-      <Select
-        value={tipoSeleccionado}
-        onValueChange={(v) => {
-          setTipoSeleccionado(v as TipoDocumento)
-          setMostrarUploader(false)
-        }}
-      >
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {tiposDisponibles.map((tipo) => (
-            <SelectItem key={tipo} value={tipo} className="text-xs">
-              <span className={`mr-1.5 text-xs font-medium ${TIPO_DOCUMENTO_INFO[tipo].textColor}`}>
-                ●
-              </span>
-              {TIPO_DOC_LABELS[tipo]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {mostrarUploader ? (
-        <DocUploader
-          matriculaId={matriculaId}
-          tipo={tipoSeleccionado}
-          onSuccess={() => setMostrarUploader(false)}
-        />
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setMostrarUploader(true)}
-          className="w-full gap-1 text-nc-green border-nc-green/30 hover:bg-nc-green-light"
-        >
-          <Upload className="h-3 w-3" />
-          Subir {TIPO_DOC_LABELS[tipoSeleccionado]}
-        </Button>
-      )}
     </div>
   )
 }

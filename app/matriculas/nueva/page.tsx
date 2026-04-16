@@ -1,5 +1,5 @@
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import MatriculaForm from '@/components/matriculas/MatriculaForm'
+import MatriculaWizard from '@/components/matriculas/form/MatriculaWizard'
 
 export default function NuevaMatriculaPage() {
   return (
@@ -8,10 +8,10 @@ export default function NuevaMatriculaPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Nueva Matrícula</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Registra una nueva matrícula para un vehículo financiado
+            Wizard en 3 pasos con autoguardado y detección de duplicados.
           </p>
         </div>
-        <MatriculaForm modo="crear" />
+        <MatriculaWizard />
       </div>
     </DashboardLayout>
   )

@@ -9,29 +9,25 @@ import type { Documento, Etapa, Matricula, TipoDocumento, TipoEvento } from '@/t
 
 const SCHEMA = 'matriculas'
 
-// Genera el código NC-YYYY-NNN via función SQL
 async function generarCodigo(): Promise<string> {
   const supabase = await createSupabaseServer()
-  // Intentar con schema option primero
-  const { data, error } = await supabase
-    .schema(SCHEMA as 'public')
-    .rpc('generar_codigo' as never)
-
+  const { data, error } = await supabase.schema(SCHEMA).rpc('generar_codigo')
   if (!error && data) return data as string
 
-  // Fallback: calcular en JS si la RPC falla
+  // Fallback: si falla la RPC (permiso, red) calculamos en JS. No es atómico
+  // pero la colisión se captura por el UNIQUE en matriculas.codigo y se
+  // reintenta en `crearMatricula`.
   const año = new Date().getFullYear()
   const { data: rows } = await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .select('codigo')
-    .like('codigo' as never, `NC-${año}-%`)
-    .order('codigo' as never, { ascending: false })
+    .like('codigo', `NC-${año}-%`)
+    .order('codigo', { ascending: false })
     .limit(1)
 
-  const ultimo = rows && (rows as { codigo: string }[]).length > 0
-    ? parseInt((rows as { codigo: string }[])[0].codigo.split('-')[2]) || 0
-    : 0
+  const ultimo =
+    rows && rows.length > 0 ? parseInt(rows[0].codigo.split('-')[2]) || 0 : 0
 
   return `NC-${año}-${String(ultimo + 1).padStart(3, '0')}`
 }
@@ -43,15 +39,12 @@ async function registrarHistorial(
   descripcion: string,
   usuario_nombre?: string
 ) {
-  await supabase
-    .schema(SCHEMA as 'public')
-    .from('historial' as never)
-    .insert({
-      matricula_id,
-      tipo_evento,
-      descripcion,
-      usuario_nombre: usuario_nombre ?? null,
-    } as never)
+  await supabase.schema(SCHEMA).from('historial').insert({
+    matricula_id,
+    tipo_evento,
+    descripcion,
+    usuario_nombre: usuario_nombre ?? null,
+  })
 }
 
 async function sincronizarEtapa(
@@ -59,34 +52,31 @@ async function sincronizarEtapa(
   matriculaId: string
 ) {
   const { data: mat } = await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .select('*')
-    .eq('id' as never, matriculaId)
+    .eq('id', matriculaId)
     .single()
 
   const { data: docs } = await supabase
-    .schema(SCHEMA as 'public')
-    .from('documentos' as never)
+    .schema(SCHEMA)
+    .from('documentos')
     .select('tipo')
-    .eq('matricula_id' as never, matriculaId)
+    .eq('matricula_id', matriculaId)
 
   if (!mat) return
 
   const matricula = mat as Matricula
   const documentos = (docs ?? []) as Pick<Documento, 'tipo'>[]
 
-  const nuevaEtapa = calcularEtapa(
-    matricula,
-    documentos as Documento[]
-  )
+  const nuevaEtapa = calcularEtapa(matricula, documentos as Documento[])
 
   if (nuevaEtapa !== matricula.etapa) {
     await supabase
-      .schema(SCHEMA as 'public')
-      .from('matriculas' as never)
-      .update({ etapa: nuevaEtapa } as never)
-      .eq('id' as never, matriculaId)
+      .schema(SCHEMA)
+      .from('matriculas')
+      .update({ etapa: nuevaEtapa })
+      .eq('id', matriculaId)
 
     await registrarHistorial(
       supabase,
@@ -106,61 +96,92 @@ export async function crearMatricula(
     data: { user },
   } = await supabase.auth.getUser()
 
-  const codigo = values.codigo || (await generarCodigo())
+  // Inserta con reintentos ante colisión del codigo unico. La RPC ya usa
+  // pg_advisory_xact_lock, pero la generación + insert ocurren en
+  // transacciones distintas (RPC -> insert), así que dejamos una red de
+  // seguridad con regeneración del código.
+  const MAX_INTENTOS = 3
+  let codigo = values.codigo || (await generarCodigo())
+  let mat: { id: string } | null = null
+  let lastErr: { message: string; code?: string } | null = null
 
-  // Insertar matrícula
-  const { data: mat, error: matErr } = await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
-    .insert({
-      codigo,
-      numero_credito: values.numero_credito || null,
-      placa: values.placa,
-      chasis: values.chasis || null,
-      marca: values.marca || null,
-      modelo: values.modelo || null,
-      año: values.año ?? null,
-      color: values.color || null,
-      lleva_traspaso: values.lleva_traspaso,
-      lleva_oposicion: values.lleva_oposicion,
-      notas: values.notas || null,
-      etapa: 'registrada',
-      created_by: user?.id ?? null,
-    } as never)
-    .select('id')
-    .single()
+  for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+    const { data, error } = await supabase
+      .schema(SCHEMA)
+      .from('matriculas')
+      .insert({
+        codigo,
+        numero_credito: values.numero_credito || null,
+        placa: values.placa,
+        chasis: values.chasis || null,
+        marca: values.marca || null,
+        modelo: values.modelo || null,
+        año: values.año ?? null,
+        color: values.color || null,
+        lleva_traspaso: values.lleva_traspaso,
+        lleva_oposicion: values.lleva_oposicion,
+        notas: values.notas || null,
+        etapa: 'registrada',
+        created_by: user?.id ?? null,
+      })
+      .select('id')
+      .single()
 
-  if (matErr || !mat) throw new Error(matErr?.message ?? 'Error al crear matrícula')
+    if (!error && data) {
+      mat = data as { id: string }
+      break
+    }
 
-  const { id: matricula_id } = mat as { id: string }
+    lastErr = error as { message: string; code?: string } | null
+    const esColisionCodigo =
+      error?.code === '23505' && /codigo/i.test(error?.message ?? '')
+    if (!esColisionCodigo || values.codigo) break
+
+    codigo = await generarCodigo()
+  }
+
+  if (!mat) {
+    throw new Error(lastErr?.message ?? 'Error al crear matrícula')
+  }
+
+  const { id: matricula_id } = mat
 
   const compradorRow = {
     matricula_id,
-    rol: 'comprador',
-    ...values.comprador,
+    rol: 'comprador' as const,
+    nombre: values.comprador.nombre,
+    apellido: values.comprador.apellido,
     cedula: values.comprador.cedula || null,
     telefono: values.comprador.telefono || null,
+    direccion: values.comprador.direccion || null,
     provincia: values.comprador.provincia || null,
     municipio: values.comprador.municipio || null,
     sector: values.comprador.sector || null,
   }
 
-  const vendedorTieneDatos = values.vendedor &&
-    [values.vendedor.nombre, values.vendedor.apellido, values.vendedor.cedula,
-     values.vendedor.telefono, values.vendedor.provincia, values.vendedor.municipio, values.vendedor.sector]
-      .some((v) => v && v.trim().length > 0)
+  const vendedorTieneDatos =
+    values.vendedor &&
+    [
+      values.vendedor.nombre,
+      values.vendedor.apellido,
+      values.vendedor.cedula,
+      values.vendedor.telefono,
+      values.vendedor.provincia,
+      values.vendedor.municipio,
+      values.vendedor.sector,
+    ].some((v) => v && v.trim().length > 0)
 
   const filas = vendedorTieneDatos
     ? [
         compradorRow,
         {
           matricula_id,
-          rol: 'vendedor',
-          ...values.vendedor,
+          rol: 'vendedor' as const,
           nombre: values.vendedor!.nombre || '',
           apellido: values.vendedor!.apellido || '',
           cedula: values.vendedor!.cedula || null,
           telefono: values.vendedor!.telefono || null,
+          direccion: values.vendedor!.direccion || null,
           provincia: values.vendedor!.provincia || null,
           municipio: values.vendedor!.municipio || null,
           sector: values.vendedor!.sector || null,
@@ -168,13 +189,8 @@ export async function crearMatricula(
       ]
     : [compradorRow]
 
-  // Insertar comprador (y vendedor si tiene datos)
-  await supabase
-    .schema(SCHEMA as 'public')
-    .from('personas' as never)
-    .insert(filas as never)
+  await supabase.schema(SCHEMA).from('personas').insert(filas)
 
-  // Historial de creación
   await registrarHistorial(
     supabase,
     matricula_id,
@@ -183,7 +199,6 @@ export async function crearMatricula(
     user?.email
   )
 
-  // Sincronizar etapa
   await sincronizarEtapa(supabase, matricula_id)
 
   revalidatePath('/')
@@ -197,64 +212,85 @@ export async function actualizarMatricula(
   values: Partial<MatriculaFormValues>
 ) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
+  // Construye el update solo con campos provistos para no pisar con null
+  // lo que no se está editando.
+  type MatriculaUpdate = Parameters<
+    ReturnType<typeof supabase.schema>['from']
+  >[0] extends 'matriculas'
+    ? object
+    : object
   const update: Record<string, unknown> = {
     updated_by: user?.id ?? null,
   }
 
   if (values.placa !== undefined) update.placa = values.placa
-  if (values.numero_credito !== undefined) update.numero_credito = values.numero_credito || null
+  if (values.numero_credito !== undefined)
+    update.numero_credito = values.numero_credito || null
   if (values.chasis !== undefined) update.chasis = values.chasis || null
   if (values.marca !== undefined) update.marca = values.marca || null
   if (values.modelo !== undefined) update.modelo = values.modelo || null
   if (values.año !== undefined) update.año = values.año ?? null
   if (values.color !== undefined) update.color = values.color || null
-  if (values.lleva_traspaso !== undefined) update.lleva_traspaso = values.lleva_traspaso
-  if (values.lleva_oposicion !== undefined) update.lleva_oposicion = values.lleva_oposicion
+  if (values.lleva_traspaso !== undefined)
+    update.lleva_traspaso = values.lleva_traspaso
+  if (values.lleva_oposicion !== undefined)
+    update.lleva_oposicion = values.lleva_oposicion
   if (values.notas !== undefined) update.notas = values.notas || null
 
+  // `update` es dinámico (partial); el cliente tipado requiere un shape
+  // conocido así que mantenemos un único cast controlado aquí.
+  type _Unused = MatriculaUpdate
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
-    .update(update as never)
-    .eq('id' as never, id)
+    .schema(SCHEMA)
+    .from('matriculas')
+    .update(update as Record<string, never>)
+    .eq('id', id)
 
   if (values.comprador) {
     await supabase
-      .schema(SCHEMA as 'public')
-      .from('personas' as never)
+      .schema(SCHEMA)
+      .from('personas')
       .update({
-        ...values.comprador,
+        nombre: values.comprador.nombre,
+        apellido: values.comprador.apellido,
         cedula: values.comprador.cedula || null,
         telefono: values.comprador.telefono || null,
+        direccion: values.comprador.direccion || null,
         provincia: values.comprador.provincia || null,
         municipio: values.comprador.municipio || null,
         sector: values.comprador.sector || null,
-      } as never)
-      .eq('matricula_id' as never, id)
-      .eq('rol' as never, 'comprador')
+      })
+      .eq('matricula_id', id)
+      .eq('rol', 'comprador')
   }
 
   if (values.vendedor) {
-    const vendTieneDatos = [values.vendedor.nombre, values.vendedor.apellido,
-      values.vendedor.cedula, values.vendedor.telefono,
-      values.vendedor.provincia, values.vendedor.municipio, values.vendedor.sector]
-        .some((v) => v && v.trim().length > 0)
+    const vendTieneDatos = [
+      values.vendedor.nombre,
+      values.vendedor.apellido,
+      values.vendedor.cedula,
+      values.vendedor.telefono,
+      values.vendedor.provincia,
+      values.vendedor.municipio,
+      values.vendedor.sector,
+    ].some((v) => v && v.trim().length > 0)
 
     if (vendTieneDatos) {
-      // Verificar si ya existe fila de vendedor
       const { data: existente } = await supabase
-        .schema(SCHEMA as 'public')
-        .from('personas' as never)
+        .schema(SCHEMA)
+        .from('personas')
         .select('id')
-        .eq('matricula_id' as never, id)
-        .eq('rol' as never, 'vendedor')
+        .eq('matricula_id', id)
+        .eq('rol', 'vendedor')
         .maybeSingle()
 
       const vendedorPayload = {
         matricula_id: id,
-        rol: 'vendedor',
+        rol: 'vendedor' as const,
         nombre: values.vendedor.nombre || '',
         apellido: values.vendedor.apellido || '',
         cedula: values.vendedor.cedula || null,
@@ -267,21 +303,24 @@ export async function actualizarMatricula(
 
       if (existente) {
         await supabase
-          .schema(SCHEMA as 'public')
-          .from('personas' as never)
-          .update(vendedorPayload as never)
-          .eq('matricula_id' as never, id)
-          .eq('rol' as never, 'vendedor')
+          .schema(SCHEMA)
+          .from('personas')
+          .update(vendedorPayload)
+          .eq('matricula_id', id)
+          .eq('rol', 'vendedor')
       } else {
-        await supabase
-          .schema(SCHEMA as 'public')
-          .from('personas' as never)
-          .insert(vendedorPayload as never)
+        await supabase.schema(SCHEMA).from('personas').insert(vendedorPayload)
       }
     }
   }
 
-  await registrarHistorial(supabase, id, 'nota_agregada', 'Datos de la matrícula actualizados', user?.email)
+  await registrarHistorial(
+    supabase,
+    id,
+    'nota_agregada',
+    'Datos de la matrícula actualizados',
+    user?.email
+  )
   await sincronizarEtapa(supabase, id)
 
   revalidatePath(`/matriculas/${id}`)
@@ -294,18 +333,17 @@ export async function subirDocumento(
   storageInfo: { nombre_archivo: string; storage_path: string }
 ) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  await supabase
-    .schema(SCHEMA as 'public')
-    .from('documentos' as never)
-    .insert({
-      matricula_id: matriculaId,
-      tipo,
-      nombre_archivo: storageInfo.nombre_archivo,
-      storage_path: storageInfo.storage_path,
-      subido_por: user?.id ?? null,
-    } as never)
+  await supabase.schema(SCHEMA).from('documentos').insert({
+    matricula_id: matriculaId,
+    tipo,
+    nombre_archivo: storageInfo.nombre_archivo,
+    storage_path: storageInfo.storage_path,
+    subido_por: user?.id ?? null,
+  })
 
   await registrarHistorial(
     supabase,
@@ -320,19 +358,23 @@ export async function subirDocumento(
   revalidatePath('/')
 }
 
-export async function eliminarDocumento(matriculaId: string, documentoId: string, storagePath: string) {
+export async function eliminarDocumento(
+  matriculaId: string,
+  documentoId: string,
+  storagePath: string
+) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Eliminar de Storage
   await supabase.storage.from('matriculas-docs').remove([storagePath])
 
-  // Eliminar de la tabla
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('documentos' as never)
+    .schema(SCHEMA)
+    .from('documentos')
     .delete()
-    .eq('id' as never, documentoId)
+    .eq('id', documentoId)
 
   await registrarHistorial(
     supabase,
@@ -348,13 +390,18 @@ export async function eliminarDocumento(matriculaId: string, documentoId: string
 
 export async function registrarOposicion(matriculaId: string, fecha: Date) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
-    .update({ fecha_oposicion: formatISO(fecha), updated_by: user?.id ?? null } as never)
-    .eq('id' as never, matriculaId)
+    .schema(SCHEMA)
+    .from('matriculas')
+    .update({
+      fecha_oposicion: formatISO(fecha),
+      updated_by: user?.id ?? null,
+    })
+    .eq('id', matriculaId)
 
   await registrarHistorial(
     supabase,
@@ -371,13 +418,15 @@ export async function registrarOposicion(matriculaId: string, fecha: Date) {
 
 export async function retirarOposicion(matriculaId: string) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
-    .update({ fecha_oposicion: null, updated_by: user?.id ?? null } as never)
-    .eq('id' as never, matriculaId)
+    .schema(SCHEMA)
+    .from('matriculas')
+    .update({ fecha_oposicion: null, updated_by: user?.id ?? null })
+    .eq('id', matriculaId)
 
   await registrarHistorial(
     supabase,
@@ -394,17 +443,19 @@ export async function retirarOposicion(matriculaId: string) {
 
 export async function iniciarTraspaso(matriculaId: string, fecha: Date) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .update({
       fecha_traspaso: formatISO(fecha),
       etapa: 'traspaso_en_proceso',
       updated_by: user?.id ?? null,
-    } as never)
-    .eq('id' as never, matriculaId)
+    })
+    .eq('id', matriculaId)
 
   await registrarHistorial(
     supabase,
@@ -420,16 +471,18 @@ export async function iniciarTraspaso(matriculaId: string, fecha: Date) {
 
 export async function completarTraspaso(matriculaId: string) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .update({
       etapa: 'traspaso_completado',
       updated_by: user?.id ?? null,
-    } as never)
-    .eq('id' as never, matriculaId)
+    })
+    .eq('id', matriculaId)
 
   await registrarHistorial(
     supabase,
@@ -445,16 +498,18 @@ export async function completarTraspaso(matriculaId: string) {
 
 export async function cerrarCaso(matriculaId: string) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .update({
       etapa: 'cerrado',
       updated_by: user?.id ?? null,
-    } as never)
-    .eq('id' as never, matriculaId)
+    })
+    .eq('id', matriculaId)
 
   await registrarHistorial(
     supabase,
@@ -470,8 +525,12 @@ export async function cerrarCaso(matriculaId: string) {
 
 export async function crearNota(matriculaId: string, contenido: string) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
+  // Tabla `notas` aún no existe en DB; se conserva el flujo pero fallará
+  // hasta que se cree. Se mantiene el cast `as never` acotado aquí.
   await supabase
     .schema(SCHEMA as 'public')
     .from('notas' as never)
@@ -486,16 +545,18 @@ export async function crearNota(matriculaId: string, contenido: string) {
 
 export async function cambiarEtapaMasivo(ids: string[], etapa: Etapa) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   await supabase
-    .schema(SCHEMA as 'public')
-    .from('matriculas' as never)
+    .schema(SCHEMA)
+    .from('matriculas')
     .update({
       etapa,
       updated_by: user?.id ?? null,
-    } as never)
-    .in('id' as never, ids as never)
+    })
+    .in('id', ids)
 
   for (const id of ids) {
     await registrarHistorial(
@@ -511,17 +572,16 @@ export async function cambiarEtapaMasivo(ids: string[], etapa: Etapa) {
   revalidatePath('/')
 }
 
-export async function snoozeAlerta(
-  matriculaId: string,
-  tipoAlerta: string
-) {
+export async function snoozeAlerta(matriculaId: string, tipoAlerta: string) {
   const supabase = await createSupabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const snoozeUntil = new Date()
   snoozeUntil.setDate(snoozeUntil.getDate() + 3)
 
-  // Delete existing snooze for this matricula+tipo and insert new one
+  // Tabla `alertas_snooze` aún no existe en DB; casts acotados aquí.
   await supabase
     .schema(SCHEMA as 'public')
     .from('alertas_snooze' as never)

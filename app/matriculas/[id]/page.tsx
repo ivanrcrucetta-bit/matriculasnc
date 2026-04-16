@@ -217,50 +217,6 @@ export default async function MatriculaDetallePage(props: DetallePageProps) {
         </div>
       </div>
 
-      {/* Versión impresa — Sobre */}
-      <div className="hidden print:block">
-        <div
-          style={{
-            width: '9.4in',
-            height: '4.4in',
-            position: 'relative',
-            padding: '0.5in',
-            fontFamily: 'serif',
-            fontSize: '12pt',
-            boxSizing: 'border-box',
-          }}
-        >
-          {/* Destinatario */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '1.5in',
-              left: '4in',
-              textAlign: 'left',
-            }}
-          >
-            {comprador && (
-              <>
-                <div style={{ fontWeight: 'bold', fontSize: '14pt' }}>
-                  {comprador.nombre} {comprador.apellido}
-                </div>
-                {matricula.numero_credito && (
-                  <div style={{ fontSize: '11pt', color: '#555' }}>
-                    Cód. cliente: {matricula.numero_credito}
-                  </div>
-                )}
-              </>
-            )}
-            {(matricula.marca || matricula.modelo) && (
-              <div style={{ marginTop: '0.12in', fontSize: '11pt', color: '#444' }}>
-                {[matricula.marca, matricula.modelo, matricula.año?.toString(), matricula.color]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </DashboardLayout>
   )
 }
