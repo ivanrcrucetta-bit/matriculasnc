@@ -191,17 +191,17 @@ export default function DocumentoUploader({
         <p className="text-xs text-muted-foreground/80 mt-1">
           PDF, JPG, PNG, WEBP — máx. 10 MB · Se optimizan automáticamente
         </p>
-        <div className="flex items-center justify-center gap-2 mt-3">
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
           {mostrarSelectorTipo && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="inline-block"
+              className="w-full sm:w-auto"
             >
               <Select
                 value={tipoSeleccionado}
                 onValueChange={(v) => setTipoSeleccionado(v as TipoDocumento)}
               >
-                <SelectTrigger className="h-8 text-xs w-56">
+                <SelectTrigger className="h-8 text-xs w-full sm:w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
