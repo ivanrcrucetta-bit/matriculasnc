@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { TIPO_DOC_LABELS } from '@/types'
 import type { TipoDocumento } from '@/types'
+import RecategorizarSelect from '../RecategorizarSelect'
 
 export interface DocViewerItem {
   id: string
@@ -37,6 +38,7 @@ interface DocViewerProps {
   initialIndex: number
   open: boolean
   onOpenChange: (open: boolean) => void
+  matriculaId?: string
 }
 
 function esImagenNombre(n: string) {
@@ -52,6 +54,7 @@ export default function DocViewer({
   initialIndex,
   open,
   onOpenChange,
+  matriculaId,
 }: DocViewerProps) {
   const [index, setIndex] = useState(initialIndex)
   const [rotate, setRotate] = useState(0)
@@ -131,9 +134,19 @@ export default function DocViewer({
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">
-              {TIPO_DOC_LABELS[item.tipo]}
-            </p>
+            {matriculaId ? (
+              <RecategorizarSelect
+                matriculaId={matriculaId}
+                documentoId={item.id}
+                tipoActual={item.tipo}
+                variant="dark"
+                className="-ml-2"
+              />
+            ) : (
+              <p className="text-sm font-medium truncate">
+                {TIPO_DOC_LABELS[item.tipo]}
+              </p>
+            )}
             <p className="text-xs text-gray-400 truncate">
               {item.nombre_archivo} · {index + 1} / {total}
             </p>
@@ -274,12 +287,7 @@ export default function DocViewer({
                   )}
                 >
                   {esImagenNombre(it.nombre_archivo) && it.signedUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={it.signedUrl}
-                      alt=""
-                      className="w-12 h-12 object-cover"
-                    />
+                    <StripThumb src={it.signedUrl} />
                   ) : (
                     <div className="w-12 h-12 bg-gray-800 flex items-center justify-center">
                       <FileText className="h-4 w-4 text-gray-500" />
@@ -351,6 +359,32 @@ function ImagenPaneable({
         }}
       />
     </div>
+  )
+}
+
+function StripThumb({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  if (failed) {
+    return (
+      <div className="w-12 h-12 bg-gray-800 flex items-center justify-center">
+        <FileText className="h-4 w-4 text-gray-500" />
+      </div>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="w-12 h-12 object-cover"
+      onError={() => setFailed(true)}
+    />
   )
 }
 

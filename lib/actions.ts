@@ -413,6 +413,43 @@ export async function eliminarDocumento(
   revalidatePath(`/matriculas/${matriculaId}`)
 }
 
+export async function recategorizarDocumento(
+  matriculaId: string,
+  documentoId: string,
+  nuevoTipo: TipoDocumento
+) {
+  const supabase = await createSupabaseServer()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: prev } = await supabase
+    .schema(SCHEMA)
+    .from('documentos')
+    .select('tipo, nombre_archivo')
+    .eq('id', documentoId)
+    .single()
+
+  if (!prev || prev.tipo === nuevoTipo) return
+
+  await supabase
+    .schema(SCHEMA)
+    .from('documentos')
+    .update({ tipo: nuevoTipo })
+    .eq('id', documentoId)
+
+  await registrarHistorial(
+    supabase,
+    matriculaId,
+    'documento_subido',
+    `Documento recategorizado: ${prev.nombre_archivo} (${prev.tipo} → ${nuevoTipo})`,
+    user?.email
+  )
+
+  await sincronizarEtapa(supabase, matriculaId)
+  revalidatePath(`/matriculas/${matriculaId}`)
+}
+
 export async function registrarOposicion(matriculaId: string, fecha: Date) {
   const supabase = await createSupabaseServer()
   const {

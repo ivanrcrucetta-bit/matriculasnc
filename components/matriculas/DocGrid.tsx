@@ -9,6 +9,7 @@ import { firmarUrlsLote } from '@/lib/actions-docs'
 import { formatFecha } from '@/lib/fecha'
 import DocumentoUploader from './uploader/DocumentoUploader'
 import DocViewer, { type DocViewerItem } from './viewer/DocViewer'
+import RecategorizarSelect from './RecategorizarSelect'
 import { TIPO_DOC_LABELS } from '@/types'
 import type { Documento, TipoDocumento } from '@/types'
 import { TIPOS_REQUERIDOS } from '@/lib/documentos'
@@ -113,7 +114,8 @@ export default function DocGrid({
               key={tipo}
               doc={doc}
               matriculaId={matriculaId}
-              thumb={thumbUrls[doc.storage_path] ?? fullUrls[doc.storage_path] ?? null}
+              thumb={thumbUrls[doc.storage_path] ?? null}
+              full={fullUrls[doc.storage_path] ?? null}
               loading={loadingUrls}
               onVer={() => abrirVisor(doc.id)}
             />
@@ -127,7 +129,8 @@ export default function DocGrid({
             key={doc.id}
             doc={doc}
             matriculaId={matriculaId}
-            thumb={thumbUrls[doc.storage_path] ?? fullUrls[doc.storage_path] ?? null}
+            thumb={thumbUrls[doc.storage_path] ?? null}
+            full={fullUrls[doc.storage_path] ?? null}
             loading={loadingUrls}
             onVer={() => abrirVisor(doc.id)}
           />
@@ -147,6 +150,7 @@ export default function DocGrid({
         initialIndex={viewerIndex}
         open={viewerOpen}
         onOpenChange={setViewerOpen}
+        matriculaId={matriculaId}
       />
     </div>
   )
@@ -158,17 +162,20 @@ function DocCard({
   doc,
   matriculaId,
   thumb,
+  full,
   loading,
   onVer,
 }: {
   doc: Documento
   matriculaId: string
   thumb: string | null
+  full: string | null
   loading: boolean
   onVer: () => void
 }) {
   const [deleting, setDeleting] = useState(false)
   const esImg = esImagenNombre(doc.nombre_archivo)
+  const tieneImagen = esImg && (thumb || full)
 
   async function handleEliminar() {
     if (!confirm('¿Eliminar este documento?')) return
@@ -186,18 +193,16 @@ function DocCard({
   return (
     <div className="border border-border rounded-lg p-4 bg-white space-y-3">
       <div className="flex items-start gap-3">
-        {esImg && thumb ? (
+        {tieneImagen ? (
           <button
             type="button"
             onClick={onVer}
-            className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity"
+            className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity bg-nc-green-light flex items-center justify-center"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={thumb}
+            <DocThumb
+              thumbUrl={thumb}
+              fullUrl={full}
               alt={doc.nombre_archivo}
-              className="w-full h-full object-cover"
-              loading="lazy"
             />
           </button>
         ) : (
@@ -211,9 +216,13 @@ function DocCard({
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">
-            {TIPO_DOC_LABELS[doc.tipo]}
-          </p>
+          <RecategorizarSelect
+            matriculaId={matriculaId}
+            documentoId={doc.id}
+            tipoActual={doc.tipo}
+            variant="light"
+            className="-ml-2"
+          />
           <p
             className="text-xs text-muted-foreground truncate"
             title={doc.nombre_archivo}
@@ -256,6 +265,43 @@ function DocCard({
         </Button>
       </div>
     </div>
+  )
+}
+
+function DocThumb({
+  thumbUrl,
+  fullUrl,
+  alt,
+}: {
+  thumbUrl: string | null
+  fullUrl: string | null
+  alt: string
+}) {
+  const initialSrc = thumbUrl ?? fullUrl
+  const [src, setSrc] = useState<string | null>(initialSrc)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setSrc(thumbUrl ?? fullUrl)
+    setFailed(false)
+  }, [thumbUrl, fullUrl])
+
+  if (failed || !src) {
+    return <FileText className="h-5 w-5 text-nc-green" />
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => {
+        if (src !== fullUrl && fullUrl) setSrc(fullUrl)
+        else setFailed(true)
+      }}
+    />
   )
 }
 
